@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* Govt. digital-services palette: deep navy ground, saffron/green accents
+   drawn from the tricolor rather than a generic purple/violet "AI" gradient. */
+:root {
+  color-scheme: dark;
+  --navy-950: #050c1a;
+  --navy-900: #0a1628;
+  --navy-800: #0f2038;
+  --navy-700: #16304f;
+  --saffron: #ff9933;
+  --saffron-600: #e5822b;
+  --india-green: #138808;
+  --india-green-600: #16a34a;
+}
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  background: var(--navy-950);
+  color: #e5e7eb;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2e38;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Shared card treatment: subtle depth + lift on hover, used across
+   search results, person/case rows, and panels so interactive surfaces
+   read consistently instead of flat borders everywhere. */
+.card-surface {
+  background: var(--navy-800);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.card-surface:hover {
+  border-color: rgba(255, 153, 51, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Thin tricolor rule — used as a header/card accent instead of a literal
+   national emblem (protected under the State Emblem of India Act). */
+.tricolor-rule {
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--saffron) 0%,
+    var(--saffron) 33%,
+    #ffffff 33%,
+    #ffffff 67%,
+    var(--india-green) 67%,
+    var(--india-green) 100%
+  );
+}
+button.card-surface:hover,
+.card-surface[role='button']:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
