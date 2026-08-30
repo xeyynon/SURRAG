@@ -1,0 +1,17 @@
+E:\SIH26\Ai Criminal\backend\venv\Lib\site-packages\pydub\utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+  warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+INFO:     Started server process [27424]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:64427 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64430 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58050 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58053 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65475 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65478 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65481 - "GET /api/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53243 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53246 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49671 - "GET /api/catalog HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64184 - "GET /api/catalog HTTP/1.1" 200 OK
