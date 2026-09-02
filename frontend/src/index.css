@@ -1,17 +1,20 @@
 @import "tailwindcss";
 
-/* Govt. digital-services palette: deep navy ground, saffron/green accents
-   drawn from the tricolor rather than a generic purple/violet "AI" gradient. */
+/* Cyber Department palette (as specified): flat, functional tones — no
+   glow/gradient decoration. Realistic enterprise/gov dashboards (CCTNS,
+   ICJS, Splunk, i2) are dense and flat, not glowing landing-page chrome. */
 :root {
   color-scheme: dark;
-  --navy-950: #050c1a;
-  --navy-900: #0a1628;
-  --navy-800: #0f2038;
-  --navy-700: #16304f;
-  --saffron: #ff9933;
-  --saffron-600: #e5822b;
-  --india-green: #138808;
-  --india-green-600: #16a34a;
+  --navy-950: #081526;   /* Dark Navy — dashboard canvas */
+  --police-blue: #012c56; /* Deep Police Blue — header/banner surfaces (darkened) */
+  --navy-800: #0d2440;    /* card/panel surface, between navy-950 and police-blue */
+  --navy-700: #14304f;    /* input/hover surface */
+  --cyber-blue: #0066b3;  /* buttons, links, highlights */
+  --cyber-blue-hover: #0078d1;
+  --electric-blue: #00aeef; /* tech/data-viz accent only, used sparingly */
+  --alert-red: #d32f2f;
+  --gov-maroon: #8b1e2d;
+  --steel-grey: #607d8b;
 }
 
 html, body, #root {
@@ -38,37 +41,23 @@ html, body, #root {
   background: transparent;
 }
 
-/* Shared card treatment: subtle depth + lift on hover, used across
-   search results, person/case rows, and panels so interactive surfaces
-   read consistently instead of flat borders everywhere. */
+/* Shared card treatment — flat, bordered, no shadow/glow/lift. A border
+   color shift on hover is enough signal for an interactive row. */
 .card-surface {
   background: var(--navy-800);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 .card-surface:hover {
-  border-color: rgba(255, 153, 51, 0.35);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  border-color: var(--steel-grey);
+  background: var(--navy-700);
 }
 
-/* Thin tricolor rule — used as a header/card accent instead of a literal
-   national emblem (protected under the State Emblem of India Act). */
-.tricolor-rule {
-  height: 3px;
-  background: linear-gradient(
-    90deg,
-    var(--saffron) 0%,
-    var(--saffron) 33%,
-    #ffffff 33%,
-    #ffffff 67%,
-    var(--india-green) 67%,
-    var(--india-green) 100%
-  );
-}
-button.card-surface:hover,
-.card-surface[role='button']:hover {
-  transform: translateY(-1px);
+/* Solid 2px rule, no gradient fade or glow — a banner divider, not a
+   decorative "scan line" effect. */
+.cyber-rule {
+  height: 2px;
+  background: var(--cyber-blue);
 }
 
 @keyframes spin {

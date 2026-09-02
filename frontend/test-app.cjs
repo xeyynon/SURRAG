@@ -21,10 +21,14 @@ async function main() {
   await page.screenshot({ path: 'shot1_catalog_schema.png' })
   await page.click('text=Schema')
 
-  // analyze
+  // analyze — sidebar auto-collapses after this, reopen it to check contents
   await page.click('button:has-text("Extract & Analyze Network")')
-  await page.waitForSelector('text=Extracted Entities', { timeout: 20000 })
+  await page.waitForSelector('text=Extracted Entities', { state: 'attached', timeout: 20000 })
   await page.waitForTimeout(2000)
+  await page.screenshot({ path: 'shot1b_collapsed.png' })
+  await page.click('button[title="Expand panel"]')
+  await page.waitForTimeout(400)
+  await page.waitForSelector('text=Extracted Entities', { timeout: 5000 })
 
   // timeline with occurrence dates
   await page.click('nav button:has-text("Timeline")')

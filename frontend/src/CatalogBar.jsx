@@ -31,7 +31,7 @@ export default function CatalogBar({ lang, refreshKey }) {
         onClick={toggleSchema}
         className="w-full flex items-center gap-4 text-xs text-gray-500 px-8 py-1.5 hover:text-gray-300 transition-colors"
       >
-        <span className="text-orange-400">{t('catalogLabel', lang)}</span>
+        <span className="text-[#00AEEF]">{t('catalogLabel', lang)}</span>
         <span>{stats.postgres.persons} {t('catPersons', lang)}</span>
         <span>·</span>
         <span>{stats.postgres.cases} {t('catCases', lang)}</span>
@@ -47,7 +47,7 @@ export default function CatalogBar({ lang, refreshKey }) {
           <div>
             <div className="text-gray-500 uppercase tracking-wide mb-1.5">PostgreSQL</div>
             {schema.postgres.map((tbl) => (
-              <div key={tbl.table} className="mb-2 bg-[#12141a] border border-white/10 rounded p-2">
+              <div key={tbl.table} className="mb-2 bg-[#0f2038] border border-white/10 rounded p-2">
                 <div className="text-gray-200 font-medium mb-1">{tbl.table}</div>
                 {tbl.columns.map((c) => (
                   <div key={c.column} className="text-gray-500">
@@ -59,7 +59,7 @@ export default function CatalogBar({ lang, refreshKey }) {
           </div>
           <div>
             <div className="text-gray-500 uppercase tracking-wide mb-1.5">Neo4j</div>
-            <div className="bg-[#12141a] border border-white/10 rounded p-2 mb-2">
+            <div className="bg-[#0f2038] border border-white/10 rounded p-2 mb-2">
               <div className="text-gray-200 font-medium mb-1">Node labels</div>
               {Object.entries(schema.neo4j.node_labels).map(([label, props]) => (
                 <div key={label} className="text-gray-500">
@@ -67,14 +67,14 @@ export default function CatalogBar({ lang, refreshKey }) {
                 </div>
               ))}
             </div>
-            <div className="bg-[#12141a] border border-white/10 rounded p-2">
+            <div className="bg-[#0f2038] border border-white/10 rounded p-2">
               <div className="text-gray-200 font-medium mb-1">Relationship types</div>
               <div className="text-gray-500">{schema.neo4j.relationship_types.join(', ')}</div>
             </div>
           </div>
           <div>
             <div className="text-gray-500 uppercase tracking-wide mb-1.5">Qdrant</div>
-            <div className="bg-[#12141a] border border-white/10 rounded p-2 space-y-0.5">
+            <div className="bg-[#0f2038] border border-white/10 rounded p-2 space-y-0.5">
               <div className="text-gray-200 font-medium">{schema.qdrant.collection}</div>
               <div className="text-gray-500">vector_size: {schema.qdrant.vector_size}</div>
               <div className="text-gray-500">distance: {schema.qdrant.distance}</div>

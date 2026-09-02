@@ -37,7 +37,7 @@ export default function HotspotMap({ crimeType, state }) {
 
   return (
     <div className="rounded-lg overflow-hidden border border-white/10" style={{ height: 420 }}>
-      <MapContainer center={INDIA_CENTER} zoom={INDIA_ZOOM} style={{ height: '100%', width: '100%', background: '#0a0c10' }}>
+      <MapContainer center={INDIA_CENTER} zoom={INDIA_ZOOM} style={{ height: '100%', width: '100%', background: '#050c1a' }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap contributors'

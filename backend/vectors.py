@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 QDRANT_URL = os.environ.get("CRIMELINK_QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.environ.get("CRIMELINK_QDRANT_API_KEY")
 COLLECTION = "fir_narratives"
 VECTOR_SIZE = 384
 
@@ -27,7 +28,7 @@ _model = None
 def get_client():
     global _client
     if _client is None:
-        _client = QdrantClient(url=QDRANT_URL)
+        _client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
     return _client
 
 

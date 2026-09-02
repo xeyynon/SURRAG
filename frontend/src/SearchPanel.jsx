@@ -36,12 +36,12 @@ export default function SearchPanel({ lang, onOpenPerson, onOpenCase }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('searchPlaceholder', lang)}
-          className="flex-1 bg-[#12141a] border border-white/10 rounded-lg p-3 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-orange-400/50"
+          className="flex-1 bg-[#0f2038] border border-white/10 rounded-lg p-3 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#0066B3]"
         />
         <button
           type="submit"
           disabled={loading}
-          className="bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 text-black font-semibold px-5 rounded-lg transition-colors flex items-center justify-center min-w-[90px]"
+          className="bg-[#0066B3] hover:bg-[#0078d1] disabled:bg-gray-700 text-black font-semibold px-5 rounded-lg transition-colors flex items-center justify-center min-w-[90px]"
         >
           {loading ? <span className="spinner" /> : t('searchButton', lang)}
         </button>

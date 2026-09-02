@@ -37,7 +37,7 @@ export default function CasesPanel({ lang, refreshKey, onOpenWorkspace }) {
                     {t('seedTag', lang)}
                   </span>
                 ) : (
-                  <span className="ml-2 text-[10px] uppercase tracking-wide text-orange-400/80 bg-orange-950/40 rounded px-1.5 py-0.5">
+                  <span className="ml-2 text-[10px] uppercase tracking-wide text-[#c77b85] bg-[#8B1E2D]/30 rounded px-1.5 py-0.5">
                     {t('submittedTag', lang)}
                   </span>
                 )}
@@ -59,7 +59,7 @@ export default function CasesPanel({ lang, refreshKey, onOpenWorkspace }) {
                       e.stopPropagation()
                       onOpenWorkspace(c.cid)
                     }}
-                    className="text-orange-400 hover:text-orange-300"
+                    className="text-[#00AEEF] hover:text-[#5cc9f5]"
                   >
                     {t('openWorkspace', lang)} →
                   </button>

@@ -23,7 +23,7 @@ export default function TimelinePanel({ lang, onOpenCase }) {
           <div key={e.cid} className="pl-6 relative">
             <span
               className={`absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full ${
-                e.is_seed ? 'bg-gray-600' : 'bg-orange-400'
+                e.is_seed ? 'bg-gray-600' : 'bg-[#00AEEF]'
               }`}
             />
             <button

@@ -47,7 +47,7 @@ export default function HotspotPanel({ lang }) {
           <select
             value={state}
             onChange={(e) => setState(e.target.value)}
-            className="mt-2 bg-[#12141a] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none min-w-[180px]"
+            className="mt-2 bg-[#0f2038] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none min-w-[180px]"
           >
             <option value="">{t('hotspotAllStates', lang)}</option>
             {meta.states.map((s) => (
@@ -64,7 +64,7 @@ export default function HotspotPanel({ lang }) {
           <select
             value={crimeType}
             onChange={(e) => setCrimeType(e.target.value)}
-            className="mt-2 bg-[#12141a] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none min-w-[220px]"
+            className="mt-2 bg-[#0f2038] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none min-w-[220px]"
           >
             {meta.crime_types.map((c) => (
               <option key={c} value={c}>

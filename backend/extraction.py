@@ -141,10 +141,10 @@ def extract_with_groq(text: str) -> dict | None:
 
         client = Groq(api_key=api_key)
         resp = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": GROQ_PROMPT.format(text=text)}],
             temperature=0,
-            max_tokens=512,
+            max_tokens=1200,
         )
         content = resp.choices[0].message.content.strip()
         content = re.sub(r"^```(json)?|```$", "", content, flags=re.MULTILINE).strip()

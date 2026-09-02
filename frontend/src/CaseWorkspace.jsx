@@ -61,7 +61,7 @@ export default function CaseWorkspace({ cid, lang, onBack, onOpenPerson, onOpenC
               {data.case.cid} · {data.case.crime_type} ·{' '}
               {data.case.is_seed ? t('seedTag', lang) : t('submittedTag', lang)}
             </p>
-            <p className="text-sm text-gray-300 mt-3 leading-relaxed bg-[#12141a] border border-white/10 rounded-lg p-3">
+            <p className="text-sm text-gray-300 mt-3 leading-relaxed bg-[#0f2038] border border-white/10 rounded-lg p-3">
               {data.case.narrative}
             </p>
           </div>
@@ -130,7 +130,7 @@ export default function CaseWorkspace({ cid, lang, onBack, onOpenPerson, onOpenC
               </h3>
               <div
                 ref={containerRef}
-                className="bg-[#0a0c10] border border-white/10 rounded-lg"
+                className="bg-[#050c1a] border border-white/10 rounded-lg"
                 style={{ height: 320 }}
               >
                 {dims.width > 0 && (
@@ -139,14 +139,20 @@ export default function CaseWorkspace({ cid, lang, onBack, onOpenPerson, onOpenC
                     graphData={graphData}
                     width={dims.width}
                     height={320}
-                    backgroundColor="#0a0c10"
+                    backgroundColor="#050c1a"
                     nodeLabel={(n) => n.label}
                     nodeColor={(n) => NODE_COLORS[n.type] || '#888'}
                     nodeRelSize={4}
                     linkColor={() => 'rgba(255,255,255,0.12)'}
                     onNodeClick={(n) => n.type === 'person' && onOpenPerson(n.domain_id)}
                     cooldownTicks={60}
-                    onEngineStop={() => graphRef.current?.zoomToFit(300, 30)}
+                    onEngineStop={() => {
+                      graphData.nodes.forEach((n) => {
+                        n.fx = n.x
+                        n.fy = n.y
+                      })
+                      graphRef.current?.zoomToFit(300, 30)
+                    }}
                   />
                 )}
               </div>

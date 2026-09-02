@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { SEED_CASES } from './seedCases'
 import { LANGUAGES, t } from './i18n'
@@ -71,17 +70,28 @@ export default function App() {
   const graphRef = useRef()
   const containerRef = useRef()
   const [dims, setDims] = useState({ width: 800, height: 600 })
+  const [hoveredNodeId, setHoveredNodeId] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect
+    function measure() {
+      const el = containerRef.current
+      if (!el) return
+      const { width, height } = el.getBoundingClientRect()
       if (width > 0 && height > 0) setDims({ width, height })
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [tab])
+    }
+    // Measured directly (not via ResizeObserver, which wasn't firing reliably
+    // for CSS-only layout changes like the sidebar collapsing) and re-run on
+    // every state change that can affect this container's box, plus a
+    // window-resize listener for actual browser resizes.
+    measure()
+    const id = requestAnimationFrame(measure)
+    window.addEventListener('resize', measure)
+    return () => {
+      cancelAnimationFrame(id)
+      window.removeEventListener('resize', measure)
+    }
+  }, [tab, sidebarOpen, result, openPersonPid, openCaseCid])
 
   useEffect(() => {
     if (tab === 'network' && result && !openPersonPid && !openCaseCid) {
@@ -89,6 +99,19 @@ export default function App() {
       return () => clearTimeout(id)
     }
   }, [tab, result, dims.width, dims.height, openPersonPid, openCaseCid])
+
+
+  useEffect(() => {
+    // Wider spacing than the library default so nodes don't pile on top of
+    // each other — that pile-up, not the zoom control itself, was the
+    // "cluttered / just zooming in and out" problem.
+    const fg = graphRef.current
+    if (fg && result) {
+      fg.d3Force('charge')?.strength(-220)
+      fg.d3Force('link')?.distance(90)
+      fg.d3ReheatSimulation()
+    }
+  }, [result])
 
   function handleLogin(name) {
     try {
@@ -139,6 +162,7 @@ export default function App() {
       const data = await res.json()
       setResult(data)
       setCasesVersion((v) => v + 1)
+      setSidebarOpen(false)
     } catch (e) {
       setError(e.message || 'Failed to analyze FIR')
     } finally {
@@ -167,6 +191,7 @@ export default function App() {
       setResult(data)
       if (data.narrative) setNarrative(data.narrative)
       setCasesVersion((v) => v + 1)
+      setSidebarOpen(false)
     } catch (e) {
       setError(e.message || 'Upload failed')
     } finally {
@@ -175,16 +200,45 @@ export default function App() {
     }
   }
 
-  const graphData = result
-    ? {
-        nodes: result.graph.nodes.map((n) => ({ ...n.data })),
-        links: result.graph.edges.map((e) => ({
-          source: e.data.source,
-          target: e.data.target,
-          weight: e.data.weight,
-        })),
-      }
-    : { nodes: [], links: [] }
+  // Memoized on `result` alone — this MUST NOT be recomputed as a fresh
+  // object on every render (e.g. from hoveredNodeId changing on every mouse
+  // move over the canvas), or react-force-graph sees a "new" graphData
+  // reference and disturbs/resets the simulation, which is what caused
+  // nodes to visibly drift on scroll/hover and made dragging unreliable.
+  const { graphData, alwaysLabelIds } = useMemo(() => {
+    if (!result) return { graphData: { nodes: [], links: [] }, alwaysLabelIds: new Set() }
+
+    const links = result.graph.edges.map((e) => ({
+      source: e.data.source,
+      target: e.data.target,
+      weight: e.data.weight,
+    }))
+    const degree = {}
+    links.forEach((l) => {
+      degree[l.source] = (degree[l.source] || 0) + 1
+      degree[l.target] = (degree[l.target] || 0) + 1
+    })
+    const nodes = result.graph.nodes.map((n) => {
+      const deg = degree[n.data.id] || 0
+      // val drives the library's own hit-test shadow radius (sqrt(val) *
+      // nodeRelSize) — keep it roughly matching the visual radius drawn in
+      // nodeCanvasObject so dragging registers where the circle looks like
+      // it is, instead of relying on a custom nodePointerAreaPaint (which
+      // wasn't registering hits reliably and fell through to canvas pan).
+      return { ...n.data, degree: deg, val: 1 + Math.min(deg, 10) * 0.9 }
+    })
+
+    // Labels always shown (rest reveal on hover) — the new FIR's own
+    // entities and the top-ranked connectors, so the "so what" of an
+    // analysis is legible without hunting through a dense graph.
+    const labelIds = new Set(nodes.filter((n) => n.highlight).map((n) => n.id))
+    const keyIds = new Set((result.insights?.key_connectors || []).map((k) => k.id))
+    nodes.forEach((n) => {
+      if (keyIds.has(n.domain_id)) labelIds.add(n.id)
+    })
+
+    return { graphData: { nodes, links }, alwaysLabelIds: labelIds }
+  }, [result])
 
   if (!investigator) {
     return <LoginScreen lang={lang} onLogin={handleLogin} />
@@ -192,13 +246,16 @@ export default function App() {
 
   return (
     <div className="h-screen text-gray-100 flex flex-col overflow-hidden" style={{ background: 'var(--navy-950)' }}>
-      <div className="tricolor-rule shrink-0" />
-      <header className="border-b border-white/10 px-8 py-4 flex items-center justify-between gap-4 shrink-0">
+      <div className="px-8 py-1 text-[11px] text-blue-100 shrink-0" style={{ background: 'var(--police-blue)' }}>
+        {t('orgLine1', lang)} &middot; {t('orgLine2', lang)}
+      </div>
+      <div className="cyber-rule shrink-0" />
+      <header className="border-b border-white/10 px-8 py-3 flex items-center justify-between gap-4 shrink-0">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-white truncate">
+          <h1 className="text-lg font-semibold tracking-tight text-white truncate">
             {t('appTitle', lang)}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5 truncate">{t('tagline', lang)}</p>
+          <p className="text-xs text-gray-500 mt-0.5 truncate">{t('tagline', lang)}</p>
         </div>
         <div className="flex items-center gap-4 shrink-0">
           <span className="text-sm text-gray-400 hidden sm:block">
@@ -206,14 +263,14 @@ export default function App() {
           </span>
           <button
             onClick={handleLogout}
-            className="text-sm text-gray-400 hover:text-orange-400 border border-white/10 rounded-lg px-3 py-1.5 transition-colors"
+            className="text-sm text-gray-400 hover:text-[#00AEEF] border border-white/10 rounded-lg px-3 py-1.5 transition-colors"
           >
             {t('logout', lang)}
           </button>
           <select
             value={lang}
             onChange={(e) => setLang(e.target.value)}
-            className="bg-[#12141a] border border-white/10 rounded-lg px-2 py-1.5 text-sm text-gray-200 focus:outline-none"
+            className="bg-[#0f2038] border border-white/10 rounded-lg px-2 py-1.5 text-sm text-gray-200 focus:outline-none"
           >
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>
@@ -221,10 +278,6 @@ export default function App() {
               </option>
             ))}
           </select>
-          <div className="text-xs text-gray-500 text-right hidden md:block">
-            <div>{t('orgLine1', lang)}</div>
-            <div>{t('orgLine2', lang)}</div>
-          </div>
         </div>
       </header>
 
@@ -245,7 +298,7 @@ export default function App() {
             }}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               tab === tabItem.id && !openPersonPid && !openCaseCid
-                ? 'border-orange-400 text-white'
+                ? 'border-[#0066B3] text-white'
                 : 'border-transparent text-gray-500 hover:text-gray-300'
             }`}
           >
@@ -256,15 +309,7 @@ export default function App() {
 
       <CatalogBar lang={lang} refreshKey={casesVersion} />
 
-      <AnimatePresence mode="wait">
-      <motion.div
-        key={openPersonPid ? `person-${openPersonPid}` : openCaseCid ? `case-${openCaseCid}` : tab}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        className="flex-1 min-h-0 flex flex-col"
-      >
+      <div className="flex-1 min-h-0 flex flex-col">
       {openPersonPid ? (
         <div className="flex-1 min-h-0">
           <PersonProfile
@@ -301,8 +346,25 @@ export default function App() {
           <TimelinePanel lang={lang} onOpenCase={openCase} />
         </div>
       ) : (
-        <div className="grid grid-cols-[380px_1fr] flex-1 min-h-0">
-          <aside className="border-r border-white/10 p-6 overflow-y-auto space-y-5">
+        <div className="flex flex-1 min-h-0 relative">
+          <button
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="absolute top-3 z-10 w-6 h-9 flex items-center justify-center card-surface rounded-r text-gray-400 text-xs transition-[left] duration-200"
+            style={{ left: sidebarOpen ? 380 : 0 }}
+            title={sidebarOpen ? t('collapsePanel', lang) : t('expandPanel', lang)}
+          >
+            {sidebarOpen ? '‹' : '›'}
+          </button>
+          <aside
+            className="border-r border-white/10 p-6 overflow-y-auto space-y-5 shrink-0"
+            style={{
+              width: sidebarOpen ? 380 : 0,
+              paddingLeft: sidebarOpen ? undefined : 0,
+              paddingRight: sidebarOpen ? undefined : 0,
+              borderRightWidth: sidebarOpen ? undefined : 0,
+              overflowX: 'hidden',
+            }}
+          >
             <p className="text-xs text-gray-500 bg-white/5 rounded-lg p-3 leading-relaxed">
               {t('illustrativeNote', lang)}
             </p>
@@ -314,7 +376,7 @@ export default function App() {
                 </label>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-xs text-orange-400 hover:text-orange-300"
+                  className="text-xs text-[#00AEEF] hover:text-[#5cc9f5]"
                 >
                   {t('uploadFile', lang)}
                 </button>
@@ -330,7 +392,7 @@ export default function App() {
                 value={narrative}
                 onChange={(e) => setNarrative(e.target.value)}
                 rows={10}
-                className="mt-2 w-full bg-[#12141a] border border-white/10 rounded-lg p-3 text-sm text-gray-200 resize-none focus:outline-none focus:ring-1 focus:ring-orange-400/50"
+                className="mt-2 w-full bg-[#0f2038] border border-white/10 rounded-lg p-3 text-sm text-gray-200 resize-none focus:outline-none focus:ring-1 focus:ring-[#0066B3]"
                 placeholder="Paste or type the FIR narrative text..."
               />
               <p className="text-[11px] text-gray-600 mt-1">{t('uploadNote', lang)}</p>
@@ -344,7 +406,7 @@ export default function App() {
                 <input
                   value={firNumber}
                   onChange={(e) => setFirNumber(e.target.value)}
-                  className="mt-2 w-full bg-[#12141a] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-orange-400/50"
+                  className="mt-2 w-full bg-[#0f2038] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#0066B3]"
                 />
               </div>
               <div>
@@ -354,7 +416,7 @@ export default function App() {
                 <input
                   value={crimeType}
                   onChange={(e) => setCrimeType(e.target.value)}
-                  className="mt-2 w-full bg-[#12141a] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-orange-400/50"
+                  className="mt-2 w-full bg-[#0f2038] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#0066B3]"
                 />
               </div>
             </div>
@@ -364,7 +426,7 @@ export default function App() {
                 {t('loadSample', lang)}
               </label>
               <select
-                className="mt-2 w-full bg-[#12141a] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none"
+                className="mt-2 w-full bg-[#0f2038] border border-white/10 rounded-lg p-2 text-sm text-gray-200 focus:outline-none"
                 onChange={(e) => {
                   const c = SEED_CASES.find((c) => c.fir_number === e.target.value)
                   if (c) {
@@ -389,7 +451,7 @@ export default function App() {
             <button
               onClick={runAnalysis}
               disabled={loading || !narrative.trim()}
-              className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 disabled:text-gray-400 text-black font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-[#0066B3] hover:bg-[#0078d1] disabled:bg-gray-700 disabled:text-gray-400 text-black font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {loading && <span className="spinner" />}
               {loading ? t('analyzing', lang) : t('analyzeBtn', lang)}
@@ -402,13 +464,7 @@ export default function App() {
             )}
 
             {result && (
-              <motion.div
-                key={result.cid}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="space-y-4 pt-2"
-              >
+              <div className="space-y-4 pt-2">
                 {result.report && (
                   <div className="bg-emerald-950/20 border border-emerald-900/40 rounded-lg p-3">
                     <h3 className="text-xs uppercase tracking-wide text-emerald-300 font-medium mb-2">
@@ -459,7 +515,7 @@ export default function App() {
                         <li key={p.pid} className="text-gray-200 flex items-center justify-between">
                           <button
                             onClick={() => openPerson(p.pid)}
-                            className="hover:text-orange-300 text-left"
+                            className="hover:text-[#5cc9f5] text-left"
                           >
                             {p.name}
                           </button>
@@ -500,8 +556,8 @@ export default function App() {
                 )}
 
                 {result.hidden_connections.length > 0 && (
-                  <div className="bg-orange-950/30 border border-orange-900/50 rounded-lg p-3">
-                    <h3 className="text-xs uppercase tracking-wide text-orange-400 font-medium mb-2">
+                  <div className="bg-[#8B1E2D]/15 border border-[#8B1E2D]/40 rounded-lg p-3">
+                    <h3 className="text-xs uppercase tracking-wide text-[#00AEEF] font-medium mb-2">
                       {t('hiddenConnections', lang)}
                     </h3>
                     <ul className="text-sm space-y-1">
@@ -509,7 +565,7 @@ export default function App() {
                         <li key={c.id} className="text-gray-200">
                           <span style={{ color: NODE_COLORS[c.type] }}>●</span>{' '}
                           {c.type === 'person' ? (
-                            <button onClick={() => openPerson(c.id)} className="hover:text-orange-300">
+                            <button onClick={() => openPerson(c.id)} className="hover:text-[#5cc9f5]">
                               {c.label}
                             </button>
                           ) : (
@@ -538,11 +594,11 @@ export default function App() {
                     ))}
                   </ol>
                 </div>
-              </motion.div>
+              </div>
             )}
           </aside>
 
-          <main className="flex flex-col min-h-0">
+          <main className="flex-1 min-w-0 flex flex-col min-h-0">
             <div className="px-6 pt-4 pb-2 flex items-center justify-between shrink-0">
               <GraphLegend />
               {result && (
@@ -564,47 +620,99 @@ export default function App() {
                 </div>
               )}
               {result && dims.width > 0 && (
-                <ForceGraph2D
-                  ref={graphRef}
-                  graphData={graphData}
-                  width={dims.width}
-                  height={dims.height}
-                  backgroundColor="#0a0c10"
-                  nodeLabel={(n) => `${n.label} (${TYPE_LABELS[n.type]})`}
-                  nodeColor={(n) => (n.highlight ? '#fbbf24' : NODE_COLORS[n.type] || '#888')}
-                  nodeRelSize={5}
-                  linkColor={() => 'rgba(255,255,255,0.12)'}
-                  linkWidth={(l) => Math.min(1 + (l.weight || 1), 4)}
-                  nodeCanvasObjectMode={() => 'after'}
-                  onNodeClick={(node) => {
-                    if (node.type === 'person') openPerson(node.domain_id)
-                    else if (node.type === 'case') openCase(node.domain_id)
-                  }}
-                  nodeCanvasObject={(node, ctx, globalScale) => {
-                    const label = node.label
-                    const fontSize = 11 / globalScale
-                    ctx.font = `${fontSize}px sans-serif`
-                    ctx.fillStyle = node.highlight ? '#fde68a' : 'rgba(229,231,235,0.85)'
-                    ctx.textAlign = 'center'
-                    ctx.fillText(label, node.x, node.y + 10 / globalScale)
-                    if (node.highlight) {
+                <>
+                  <ForceGraph2D
+                    ref={graphRef}
+                    graphData={graphData}
+                    width={dims.width}
+                    height={dims.height}
+                    backgroundColor="#050c1a"
+                    nodeLabel={(n) => `${n.label} (${TYPE_LABELS[n.type]})`}
+                    linkColor={(l) => (l.weight > 1 ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)')}
+                    linkWidth={(l) => Math.min(0.6 + (l.weight || 1) * 0.5, 3)}
+                    onNodeClick={(node) => {
+                      if (node.type === 'person') openPerson(node.domain_id)
+                      else if (node.type === 'case') openCase(node.domain_id)
+                    }}
+                    onNodeHover={(node) => setHoveredNodeId(node ? node.id : null)}
+                    nodeRelSize={4}
+                    nodeCanvasObject={(node, ctx, globalScale) => {
+                      const r = 4 + Math.min(node.degree, 10) * 1.3
+                      const isHovered = node.id === hoveredNodeId
+                      const showLabel = isHovered || alwaysLabelIds.has(node.id) || globalScale > 2.2
+
                       ctx.beginPath()
-                      ctx.arc(node.x, node.y, 8, 0, 2 * Math.PI)
-                      ctx.strokeStyle = '#fbbf24'
-                      ctx.lineWidth = 1.5
-                      ctx.stroke()
-                    }
-                  }}
-                  cooldownTicks={80}
-                  onEngineStop={() => graphRef.current?.zoomToFit(400, 60)}
-                />
+                      ctx.arc(node.x, node.y, r, 0, 2 * Math.PI)
+                      ctx.fillStyle = node.highlight ? '#fbbf24' : NODE_COLORS[node.type] || '#888'
+                      ctx.fill()
+                      if (isHovered || node.highlight) {
+                        ctx.lineWidth = 1.5 / globalScale
+                        ctx.strokeStyle = node.highlight ? '#fde68a' : '#ffffff'
+                        ctx.stroke()
+                      }
+
+                      if (!showLabel) return
+                      const fontSize = Math.max(10, Math.min(13, 12 / globalScale))
+                      ctx.font = `${fontSize}px 'Segoe UI', sans-serif`
+                      const textWidth = ctx.measureText(node.label).width
+                      const padX = 4 / globalScale
+                      const padY = 2 / globalScale
+                      const boxY = node.y + r + 3 / globalScale
+                      ctx.fillStyle = 'rgba(5,12,26,0.85)'
+                      ctx.fillRect(
+                        node.x - textWidth / 2 - padX,
+                        boxY,
+                        textWidth + padX * 2,
+                        fontSize + padY * 2
+                      )
+                      ctx.fillStyle = node.highlight ? '#fde68a' : '#e5e7eb'
+                      ctx.textAlign = 'center'
+                      ctx.textBaseline = 'top'
+                      ctx.fillText(node.label, node.x, boxY + padY)
+                    }}
+                    cooldownTicks={100}
+                    onEngineStop={() => {
+                      // Freeze the settled layout — otherwise scroll/drag
+                      // interactions can nudge the physics simulation back
+                      // to life and nodes visibly drift while you're just
+                      // trying to zoom/pan.
+                      graphData.nodes.forEach((n) => {
+                        n.fx = n.x
+                        n.fy = n.y
+                      })
+                      graphRef.current?.zoomToFit(400, 60)
+                    }}
+                  />
+                  <div className="absolute bottom-4 right-4 flex flex-col gap-1">
+                    <button
+                      onClick={() => graphRef.current?.zoom(graphRef.current.zoom() * 1.4, 250)}
+                      className="w-7 h-7 flex items-center justify-center card-surface rounded text-gray-300 text-sm"
+                      title={t('zoomIn', lang)}
+                    >
+                      +
+                    </button>
+                    <button
+                      onClick={() => graphRef.current?.zoom(graphRef.current.zoom() / 1.4, 250)}
+                      className="w-7 h-7 flex items-center justify-center card-surface rounded text-gray-300 text-sm"
+                      title={t('zoomOut', lang)}
+                    >
+                      −
+                    </button>
+                    <button
+                      onClick={() => graphRef.current?.zoomToFit(400, 60)}
+                      className="w-7 h-7 flex items-center justify-center card-surface rounded text-gray-300 text-[10px]"
+                      title={t('fitView', lang)}
+                    >
+                      ⤢
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </main>
         </div>
       )}
-      </motion.div>
-      </AnimatePresence>
+      </div>
     </div>
   )
 }
