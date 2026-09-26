@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Depends, Header, UploadFile, File, Form
+import os
+import time
+from fastapi import FastAPI, HTTPException, Depends, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -6,6 +8,7 @@ import pg
 import neo
 import vectors
 import documents
+import hashlib
 from seed_data import SEED_CASES
 from extraction import extract_entities
 from entity_resolution import resolve_case_persons
@@ -13,7 +16,7 @@ from hotspot import list_states, list_districts, get_hotspots, CRIME_COLUMNS
 from auth import require_api_key
 from report import synthesize_report
 
-app = FastAPI(title="CrimeLink Prototype API")
+app = FastAPI(title="SURRAG Prototype API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,6 +88,7 @@ def build_analysis_response(cid: str, narrative: str, entities: dict, resolved_p
         "graph": neo.to_frontend_graph(highlight_ids=new_ids),
         "insights": insights,
         "hidden_connections": hidden_connections,
+        "linked_cases": neo.linked_cases(cid),
         "similar_cases": similar_cases,
         "report": report,
     }
@@ -92,9 +96,19 @@ def build_analysis_response(cid: str, narrative: str, entities: dict, resolved_p
 
 @app.on_event("startup")
 def on_startup():
-    pg.init_db()
-    neo.init_constraints()
-    vectors.ensure_collection()
+    # On Railway all four services boot together; the data stores may not
+    # accept connections yet when this container starts.
+    for attempt in range(30):
+        try:
+            pg.init_db()
+            neo.init_constraints()
+            vectors.ensure_collection()
+            break
+        except Exception as e:
+            if attempt == 29:
+                raise
+            print(f"data stores not ready ({e.__class__.__name__}), retrying...")
+            time.sleep(5)
 
     if pg.seed_count() == 0:
         for case in SEED_CASES:
@@ -122,7 +136,7 @@ def api_list_cases():
 def api_get_case(cid: str):
     case = pg.get_case(cid)
     if case is None:
-        return {"error": "not found"}, 404
+        raise HTTPException(404, "Case not found")
     return case
 
 
@@ -153,7 +167,7 @@ async def upload_evidence(file: UploadFile = File(...), fir_number: str = Form("
     raw = await file.read()
     extracted = documents.extract_text(file.filename, raw)
     if extracted["error"]:
-        return {"error": extracted["error"]}
+        raise HTTPException(422, extracted["error"])
     narrative = extracted["text"]
 
     entities = extract_entities(narrative)
@@ -162,6 +176,12 @@ async def upload_evidence(file: UploadFile = File(...), fir_number: str = Form("
                           submitted_by=x_investigator_name, entities=entities)
     response = build_analysis_response(cid, narrative, result["entities"], result["resolved_persons"])
     response["extraction_method"] = extracted["method"]
+    ent = result["entities"]
+    n_entities = sum(len(ent.get(k, [])) for k in ("persons", "locations", "phones", "vehicles"))
+    response["evidence_id"] = pg.insert_evidence(
+        cid, file.filename, (file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "unknown"),
+        len(raw), hashlib.sha256(raw).hexdigest(), extracted["method"], n_entities, x_investigator_name,
+    )
     return response
 
 
@@ -173,7 +193,7 @@ def api_case_workspace(cid: str):
     subgraph, similar prior cases, and a freshly-synthesized lead report."""
     case = pg.get_case(cid)
     if case is None:
-        return {"error": "not found"}, 404
+        raise HTTPException(404, "Case not found")
 
     persons = pg.get_case_persons(cid)
     resolved_persons = [{"pid": p["pid"], "name": p["canonical_name"], "is_new": False} for p in persons]
@@ -194,7 +214,8 @@ def api_case_workspace(cid: str):
 def api_get_person(pid: str):
     profile = pg.get_person_profile(pid)
     if profile is None:
-        return {"error": "not found"}, 404
+        raise HTTPException(404, "Person not found")
+    profile["risk"] = neo.person_risk().get(pid)
     return profile
 
 
@@ -260,3 +281,88 @@ def hotspots_by_state(crime_type: str = CRIME_COLUMNS[0]):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+class CaseStatusUpdate(BaseModel):
+    status: str | None = None
+    priority: str | None = None
+
+
+@app.patch("/api/cases/{cid}/status")
+def api_set_case_status(cid: str, req: CaseStatusUpdate, _auth: str = Depends(require_api_key)):
+    if req.status is not None and req.status not in pg.CASE_STATUSES:
+        raise HTTPException(400, f"status must be one of {pg.CASE_STATUSES}")
+    if req.priority is not None and req.priority not in pg.CASE_PRIORITIES:
+        raise HTTPException(400, f"priority must be one of {pg.CASE_PRIORITIES}")
+    case = pg.set_case_status(cid, req.status, req.priority)
+    if case is None:
+        raise HTTPException(404, "case not found")
+    return case
+
+
+@app.get("/api/evidence")
+def api_evidence(cid: str | None = None):
+    return {"evidence": pg.list_evidence(cid)}
+
+
+@app.get("/api/dashboard")
+def api_dashboard():
+    stats = pg.dashboard_stats()
+    counts = neo.label_counts()
+    stats["entity_composition"] = [
+        {"label": k, "count": counts.get(k, 0)} for k in ("Person", "Location", "Phone", "Vehicle")
+    ]
+    stats["totals"] = {**pg.catalog_stats(), "vectors": vectors.stats()}
+    stats["high_risk_persons"] = sum(1 for r in neo.person_risk().values() if r["risk_level"] == "High")
+    return stats
+
+
+@app.get("/api/persons/{pid}/risk")
+def api_person_risk(pid: str):
+    risk = neo.person_risk().get(pid)
+    if risk is None:
+        raise HTTPException(404, "person not found in graph")
+    return {"pid": pid, **risk}
+
+
+@app.get("/api/search/semantic")
+def api_semantic_search(q: str, top_k: int = 5):
+    """Qdrant matches plus a 'why matched' list: the similarity score and any
+    entity or crime type from the stored case that the query text mentions."""
+    hits = vectors.search_similar(q, top_k=top_k)
+    q_lower = q.lower()
+    for h in hits:
+        case = pg.get_case(h["cid"])
+        reasons = [f"Narrative similarity {round(h['score'] * 100)}%"]
+        if case:
+            ent = case["entities"]
+            for kind, key in (("person", "persons"), ("location", "locations"),
+                              ("phone", "phones"), ("vehicle", "vehicles")):
+                for v in ent.get(key, []):
+                    name = v.get("name") if isinstance(v, dict) else v
+                    if name and name.lower() in q_lower:
+                        reasons.append(f"Query mentions {kind} '{name}'")
+            if case["crime_type"].lower() in q_lower:
+                reasons.append(f"Same crime type: {case['crime_type']}")
+            h["status"], h["priority"] = case["status"], case["priority"]
+        h["reasons"] = reasons
+    return {"query": q, "results": hits}
+
+
+# Production: serve the built frontend from this same process so the
+# relative /api/* calls need no proxy or CORS. Absent in local dev (vite serves it).
+_DIST = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(_DIST):
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/assets", StaticFiles(directory=os.path.join(_DIST, "assets")), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path.startswith("api/"):
+            raise HTTPException(status_code=404)
+        candidate = os.path.realpath(os.path.join(_DIST, path))
+        if path and candidate.startswith(os.path.realpath(_DIST) + os.sep) and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_DIST, "index.html"))

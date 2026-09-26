@@ -9,8 +9,8 @@ async function main() {
   })
   page.on('pageerror', (err) => consoleErrors.push('pageerror: ' + err.message))
 
-  await page.goto('http://localhost:5173', { waitUntil: 'networkidle' })
-  await page.waitForSelector('text=CrimeLink')
+  await page.goto('http://localhost:3100', { waitUntil: 'networkidle' })
+  await page.waitForSelector('text=SURRAG')
   await page.fill('input[placeholder]', 'Insp. Rao')
   await page.click('button:has-text("Enter Workspace")')
   await page.waitForSelector('text=Network Analysis')

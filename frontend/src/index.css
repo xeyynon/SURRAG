@@ -1,28 +1,60 @@
 @import "tailwindcss";
 
-/* Cyber Department palette (as specified): flat, functional tones — no
-   glow/gradient decoration. Realistic enterprise/gov dashboards (CCTNS,
-   ICJS, Splunk, i2) are dense and flat, not glowing landing-page chrome. */
+/* Graphite + amber, modelled on analyst tools (Palantir Gotham, i2, Maltego):
+   neutral charcoal so data colours stand out, a maroon government banner,
+   amber as the single action colour, red reserved for alerts. Flat: no glow,
+   gradient, grid backdrop or accent stripe (see MD/FRONTEND.md, rejected
+   designs). Components use these tokens, never raw hex; the JS-only colours
+   the graph canvas needs live in graphStyle.js. */
 :root {
   color-scheme: dark;
-  --navy-950: #081526;   /* Dark Navy — dashboard canvas */
-  --police-blue: #012c56; /* Deep Police Blue — header/banner surfaces (darkened) */
-  --navy-800: #0d2440;    /* card/panel surface, between navy-950 and police-blue */
-  --navy-700: #14304f;    /* input/hover surface */
-  --cyber-blue: #0066b3;  /* buttons, links, highlights */
-  --cyber-blue-hover: #0078d1;
-  --electric-blue: #00aeef; /* tech/data-viz accent only, used sparingly */
-  --alert-red: #d32f2f;
-  --gov-maroon: #8b1e2d;
-  --steel-grey: #607d8b;
+
+  --bg-canvas: #181a1e;   /* page */
+  --bg-graph: #22252a;    /* graph and map stage: a step above the page, not a void */
+  --bg-panel: #292d33;    /* bars, side panels, cards */
+  --bg-raised: #30353b;   /* inputs and items on a card */
+  --bg-hover: #383d44;
+  --banner: #4a141c;
+
+  --accent: #c8973a;
+  --accent-hover: #dcae52;
+  --accent-ink: #e0b04f;
+  --accent-ink-hover: #f0cd7f;
+  --alert: #d32f2f;
+  --maroon: #8b1e2d;
+  --maroon-ink: #d08a92;
+  --steel: #6b7580;
+  --grid-line: rgba(255, 255, 255, 0.08);
+  --chart-axis: #a0a8b3; /* 5.76:1 on a card */
+}
+
+/* Text greys, contrast measured against canvas / panel / hover surfaces
+   (WCAG AA needs 4.5:1). Tailwind's stock gray-500 and gray-600 measured
+   3.85 / 3.50 / 3.07 and 2.46 / 2.24 / 1.96 - the metadata and hint text
+   used in ~76 places was below AA - so both are redefined:
+     gray-500 #a0a8b3 -> 7.26 / 6.40 / 5.76 / 5.15 on page / stage / card / raised
+     gray-600 #98a0ab -> 6.60 / 5.82 / 5.24 / 4.68 (4.14 on hover)
+   src/tokens.test.mjs re-checks these numbers. */
+@theme {
+  /* Inter has no Indic glyphs; the Noto families are listed so each script falls through to a proper font (loaded from Google Fonts only for the scripts actually on screen), then to the system. */
+  --font-sans: 'Inter', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Oriya', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Meetei Mayek', 'Noto Naskh Arabic', 'Nirmala UI', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  /* A precision tool, not a friendly app: tighter corners than Tailwind's
+     defaults (8px -> 6px, 6px -> 4px). */
+  --radius-lg: 0.375rem;
+  --radius-md: 0.25rem;
+  --color-gray-400: #b4bbc5;
+  --color-gray-500: #a0a8b3;
+  --color-gray-600: #98a0ab;
 }
 
 html, body, #root {
   margin: 0;
   height: 100%;
-  background: var(--navy-950);
+  background: var(--bg-canvas);
   color: #e5e7eb;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
 }
 
 * {
@@ -41,23 +73,21 @@ html, body, #root {
   background: transparent;
 }
 
-/* Shared card treatment — flat, bordered, no shadow/glow/lift. A border
-   color shift on hover is enough signal for an interactive row. */
+:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+/* Shared card treatment - flat, bordered, no shadow/glow/lift. A border
+   colour shift on hover is enough signal for an interactive row. */
 .card-surface {
-  background: var(--navy-800);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-raised);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 .card-surface:hover {
-  border-color: var(--steel-grey);
-  background: var(--navy-700);
-}
-
-/* Solid 2px rule, no gradient fade or glow — a banner divider, not a
-   decorative "scan line" effect. */
-.cyber-rule {
-  height: 2px;
-  background: var(--cyber-blue);
+  border-color: var(--steel);
+  background: var(--bg-hover);
 }
 
 @keyframes spin {
@@ -71,4 +101,62 @@ html, body, #root {
   border-right-color: transparent;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2s;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Every number, id and score is mono with tabular figures so columns line
+   up and a value does not shift its neighbours as it changes. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Native cross-fade between screens (View Transitions API); browsers
+   without it simply switch instantly. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.14s;
+}
+
+
+/* Printing a case report: paper, black on white, no app chrome. The stamp
+   line names what produced the document and tells the reader to verify it. */
+.print-only {
+  display: none;
+}
+@media print {
+  html, body, #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+  }
+  .no-print, header, nav {
+    display: none !important;
+  }
+  .print-only {
+    display: block;
+  }
+  * {
+    color: #000000 !important;
+    border-color: #cccccc !important;
+    background: transparent !important;
+  }
+  .overflow-y-auto, .overflow-hidden {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  .h-screen {
+    height: auto !important;
+  }
+  canvas {
+    display: none !important;
+  }
 }

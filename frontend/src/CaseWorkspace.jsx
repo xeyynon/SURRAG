@@ -1,165 +1,224 @@
-import { useEffect, useRef, useState } from 'react'
-import ForceGraph2D from 'react-force-graph-2d'
-import { t } from './i18n'
+import { useMemo, useState } from 'react'
+import { t, tv } from './i18n'
+import { apiFetch, useApi } from './api'
+import { NODE_COLORS } from './graphStyle'
+import { buildGraphData } from './graphData'
+import NetworkGraph from './NetworkGraph'
+import { reportProvenance } from './AnalysisResults'
+import { Async, Empty, ErrorNote, StatusBadge, STATUS_TONE, PRIORITY_TONE } from './ui'
 
-const NODE_COLORS = {
-  person: '#f97316',
-  location: '#38bdf8',
-  phone: '#a78bfa',
-  vehicle: '#4ade80',
-  case: '#f43f5e',
+const STATUSES = ['Open', 'Under Investigation', 'Charge-sheeted', 'Closed']
+const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
+
+const sectionTitle = 'text-xs uppercase tracking-wide text-gray-500 font-medium mb-2'
+
+function Workspace({ cid, data, lang, onOpenPerson, onOpenCase }) {
+  const evidence = useApi(`/api/evidence?cid=${cid}`)
+  const [caseRecord, setCaseRecord] = useState(data.case)
+  const [updateError, setUpdateError] = useState(null)
+
+  // Memoised on the loaded record; see NetworkGraph for why this matters.
+  const personPids = data.persons.map((p) => p.pid)
+  const { graphData, alwaysLabelIds } = useMemo(
+    () => buildGraphData(data.subgraph, personPids),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data]
+  )
+
+  async function updateCase(patch) {
+    setUpdateError(null)
+    try {
+      const updated = await apiFetch(`/api/cases/${cid}/status`, { method: 'PATCH', json: patch })
+      setCaseRecord((c) => ({ ...c, status: updated.status, priority: updated.priority }))
+    } catch (e) {
+      setUpdateError(e.message)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="num text-2xl font-medium text-white">{caseRecord.fir_number}</h1>
+            <p className="text-xs text-gray-400 mt-1">
+              {caseRecord.crime_type} · {caseRecord.is_seed ? t('seedTag', lang) : t('submittedTag', lang)}
+              {caseRecord.submitted_by && ` · ${t('registeredBy', lang)} ${caseRecord.submitted_by}`}
+              {' · '}
+              {new Date(caseRecord.occurred_on || caseRecord.created_at).toLocaleDateString()}
+            </p>
+          </div>
+          <button
+            onClick={() => window.print()}
+            className="no-print shrink-0 text-xs text-gray-300 hover:text-white border border-white/15 rounded-lg px-3 py-1.5"
+          >
+            {t('printReport', lang)}
+          </button>
+        </div>
+        <p className="print-only text-xs mt-2">
+          {t('printStamp', lang)} · {new Date().toLocaleString()}
+        </p>
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 mt-4 no-print">
+          <div className="flex items-center gap-1.5" role="group" aria-label={t('statusLabel', lang)}>
+            {STATUSES.map((s, i) => {
+              const current = STATUSES.indexOf(caseRecord.status)
+              const reached = i <= current
+              return (
+                <div key={s} className="flex items-center gap-1.5">
+                  {i > 0 && <span className={`w-5 h-px ${i <= current ? 'bg-[var(--accent)]' : 'bg-white/15'}`} />}
+                  <button
+                    onClick={() => updateCase({ status: s })}
+                    aria-pressed={i === current}
+                    className={`flex items-center gap-1.5 text-xs rounded-lg px-2 py-1 hover:bg-[var(--bg-hover)] ${
+                      i === current ? 'text-white font-medium' : reached ? 'text-gray-300' : 'text-gray-500'
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${reached ? 'bg-[var(--accent)]' : 'border border-gray-500'}`}
+                      aria-hidden="true"
+                    />
+                    {tv('status', s, lang)}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500">
+            <StatusBadge tone={PRIORITY_TONE[caseRecord.priority] || 'neutral'}>{t('priorityLabel', lang)}</StatusBadge>
+            <select
+              value={caseRecord.priority}
+              onChange={(e) => updateCase({ priority: e.target.value })}
+              className="bg-[var(--bg-raised)] border border-white/10 rounded-lg px-2 py-1 text-sm normal-case text-gray-200"
+            >
+              {PRIORITIES.map((o) => (
+                <option key={o} value={o}>{tv('priority', o, lang)}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {updateError && (
+          <div className="mt-3">
+            <ErrorNote message={updateError} lang={lang} />
+          </div>
+        )}
+        <p className="text-sm text-gray-300 mt-3 leading-relaxed bg-[var(--bg-panel)] border border-white/10 rounded-lg p-3">
+          {caseRecord.narrative}
+        </p>
+      </div>
+
+      <div>
+        <h3 className={sectionTitle}>
+          {t('evidenceHeading', lang)}
+          {evidence.data ? ` (${evidence.data.evidence.length})` : ''}
+        </h3>
+        <Async state={evidence} lang={lang}>
+          {({ evidence: items }) =>
+            items.length === 0 ? (
+              <Empty>{t('noEvidence', lang)}</Empty>
+            ) : (
+              <div className="space-y-1.5">
+                {items.map((e) => (
+                  <div key={e.evidence_id} className="card-surface rounded-lg p-2.5 text-xs">
+                    <div className="flex justify-between text-gray-200">
+                      <span>
+                        {e.filename}{' '}
+                        <span className="text-gray-500">· {e.file_type} · {e.size_bytes} B · {e.extraction_method}</span>
+                      </span>
+                      <span className="font-mono text-gray-500">{e.evidence_id}</span>
+                    </div>
+                    <div className="font-mono text-[10px] text-gray-500 mt-1 break-all">SHA-256 {e.sha256}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          }
+        </Async>
+      </div>
+
+      {data.report && (
+        <details className="border border-white/10 rounded-lg p-3" open>
+          <summary className="text-xs uppercase tracking-wide text-gray-400 font-medium cursor-pointer">
+            {t('leadReport', lang)}
+          </summary>
+          <p className="mt-2 text-[11px] text-gray-500">{reportProvenance(data.report.source, lang)}</p>
+          <pre className="mt-2 text-xs text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">
+            {data.report.narrative}
+          </pre>
+        </details>
+      )}
+
+      <div className="grid grid-cols-2 gap-6">
+        <div>
+          <h3 className={sectionTitle}>
+            {t('people', lang)} ({data.persons.length})
+          </h3>
+          <div className="space-y-1.5">
+            {data.persons.map((p) => (
+              <button
+                key={p.pid}
+                onClick={() => onOpenPerson(p.pid)}
+                className="card-surface w-full text-left text-sm rounded-lg p-2.5 flex items-center justify-between"
+              >
+                <span className="text-gray-100">
+                  <span style={{ color: NODE_COLORS.person }}>●</span> {p.canonical_name}
+                </span>
+                <span className="num text-xs text-gray-500">{p.pid}</span>
+              </button>
+            ))}
+            {data.persons.length === 0 && <Empty>{t('noPersonsInCase', lang)}</Empty>}
+          </div>
+
+          {data.similar_cases.length > 0 && (
+            <div className="mt-4">
+              <h3 className={sectionTitle}>{t('similarCases', lang)}</h3>
+              <div className="space-y-1.5">
+                {data.similar_cases.map((c) => (
+                  <button
+                    key={c.cid}
+                    onClick={() => onOpenCase(c.cid)}
+                    className="card-surface w-full text-left text-sm rounded-lg p-2.5 flex items-center justify-between"
+                  >
+                    <span className="text-gray-100">{c.fir_number}</span>
+                    <span className="text-gray-400 text-xs tabular-nums" title={t('similarityHint', lang)}>
+                      {(c.score * 100).toFixed(0)}%
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h3 className={sectionTitle}>{t('caseSubgraph', lang)}</h3>
+          <div className="border border-white/10 rounded-lg overflow-hidden" style={{ height: 320 }}>
+            <NetworkGraph
+              graphData={graphData}
+              alwaysLabelIds={alwaysLabelIds}
+              layoutKey={cid}
+              lang={lang}
+              onNodeClick={(n) => n.type === 'person' && onOpenPerson(n.domain_id)}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function CaseWorkspace({ cid, lang, onBack, onOpenPerson, onOpenCase }) {
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
-  const graphRef = useRef()
-  const containerRef = useRef()
-  const [dims, setDims] = useState({ width: 400, height: 300 })
-
-  useEffect(() => {
-    setData(null)
-    setError(null)
-    fetch(`/api/cases/${cid}/workspace`)
-      .then((r) => r.json())
-      .then((d) => (d.error ? setError(d.error) : setData(d)))
-      .catch(() => setError('Failed to load case workspace'))
-  }, [cid])
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect
-      if (width > 0 && height > 0) setDims({ width, height })
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [data])
-
-  const graphData = data
-    ? {
-        nodes: data.subgraph.nodes.map((n) => ({ ...n.data })),
-        links: data.subgraph.edges.map((e) => ({ source: e.data.source, target: e.data.target })),
-      }
-    : { nodes: [], links: [] }
+  const state = useApi(`/api/cases/${cid}/workspace`)
 
   return (
     <div className="h-full overflow-y-auto p-6 max-w-5xl mx-auto w-full">
-      <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-300 mb-4">
+      <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-200 mb-4">
         ← {t('back', lang)}
       </button>
-
-      {error && <div className="text-red-400 text-sm">{error}</div>}
-      {!data && !error && <div className="text-gray-500 text-sm">{t('loading', lang)}…</div>}
-
-      {data && (
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-white">{data.case.fir_number}</h1>
-            <p className="text-xs text-gray-500 font-mono mt-1">
-              {data.case.cid} · {data.case.crime_type} ·{' '}
-              {data.case.is_seed ? t('seedTag', lang) : t('submittedTag', lang)}
-            </p>
-            <p className="text-sm text-gray-300 mt-3 leading-relaxed bg-[#0f2038] border border-white/10 rounded-lg p-3">
-              {data.case.narrative}
-            </p>
-          </div>
-
-          {data.report && (
-            <div className="bg-emerald-950/20 border border-emerald-900/40 rounded-lg p-3">
-              <h3 className="text-xs uppercase tracking-wide text-emerald-300 font-medium mb-2">
-                {t('leadReport', lang)}
-                <span className="ml-2 text-[10px] text-gray-600 normal-case">({data.report.source})</span>
-              </h3>
-              <pre className="text-xs text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">
-                {data.report.narrative}
-              </pre>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-xs uppercase tracking-wide text-gray-500 font-medium mb-2">
-                {t('people', lang)} ({data.persons.length})
-              </h3>
-              <div className="space-y-1.5">
-                {data.persons.map((p) => (
-                  <button
-                    key={p.pid}
-                    onClick={() => onOpenPerson(p.pid)}
-                    className="card-surface w-full text-left text-sm rounded-lg p-2.5 flex items-center justify-between"
-                  >
-                    <span className="text-gray-100">
-                      <span style={{ color: NODE_COLORS.person }}>●</span> {p.canonical_name}
-                    </span>
-                    <span className="text-xs text-gray-500 font-mono">{p.pid}</span>
-                  </button>
-                ))}
-                {data.persons.length === 0 && (
-                  <div className="text-sm text-gray-600">{t('noPersonsInCase', lang)}</div>
-                )}
-              </div>
-
-              {data.similar_cases.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-xs uppercase tracking-wide text-purple-300 font-medium mb-2">
-                    {t('similarCases', lang)}
-                  </h3>
-                  <div className="space-y-1.5">
-                    {data.similar_cases.map((c) => (
-                      <button
-                        key={c.cid}
-                        onClick={() => onOpenCase(c.cid)}
-                        className="card-surface w-full text-left text-sm rounded-lg p-2.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-100">{c.fir_number}</span>
-                          <span className="text-purple-300 text-xs">{(c.score * 100).toFixed(0)}%</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h3 className="text-xs uppercase tracking-wide text-gray-500 font-medium mb-2">
-                {t('caseSubgraph', lang)}
-              </h3>
-              <div
-                ref={containerRef}
-                className="bg-[#050c1a] border border-white/10 rounded-lg"
-                style={{ height: 320 }}
-              >
-                {dims.width > 0 && (
-                  <ForceGraph2D
-                    ref={graphRef}
-                    graphData={graphData}
-                    width={dims.width}
-                    height={320}
-                    backgroundColor="#050c1a"
-                    nodeLabel={(n) => n.label}
-                    nodeColor={(n) => NODE_COLORS[n.type] || '#888'}
-                    nodeRelSize={4}
-                    linkColor={() => 'rgba(255,255,255,0.12)'}
-                    onNodeClick={(n) => n.type === 'person' && onOpenPerson(n.domain_id)}
-                    cooldownTicks={60}
-                    onEngineStop={() => {
-                      graphData.nodes.forEach((n) => {
-                        n.fx = n.x
-                        n.fy = n.y
-                      })
-                      graphRef.current?.zoomToFit(300, 30)
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Async state={state} lang={lang}>
+        {(data) => (
+          <Workspace cid={cid} data={data} lang={lang} onOpenPerson={onOpenPerson} onOpenCase={onOpenCase} />
+        )}
+      </Async>
     </div>
   )
 }

@@ -14,8 +14,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-PG_DSN = os.environ.get(
-    "CRIMELINK_PG_DSN", "postgresql://crimelink:crimelink@localhost:5432/crimelink"
+# DATABASE_URL is what Railway's Postgres plugin exposes.
+PG_DSN = (
+    os.environ.get("CRIMELINK_PG_DSN")
+    or os.environ.get("DATABASE_URL")
+    or "postgresql://crimelink:crimelink@localhost:5432/crimelink"
 )
 
 
@@ -55,6 +58,24 @@ def init_db():
         )
         conn.execute("ALTER TABLE cases ADD COLUMN IF NOT EXISTS submitted_by TEXT")
         conn.execute("ALTER TABLE cases ADD COLUMN IF NOT EXISTS occurred_on DATE")
+        conn.execute("ALTER TABLE cases ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Open'")
+        conn.execute("ALTER TABLE cases ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'Medium'")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS evidence (
+                evidence_id TEXT PRIMARY KEY,
+                cid TEXT NOT NULL REFERENCES cases(cid),
+                filename TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                sha256 TEXT NOT NULL,
+                extraction_method TEXT NOT NULL,
+                entity_count INTEGER NOT NULL DEFAULT 0,
+                uploaded_by TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS person_case_link (
@@ -239,7 +260,7 @@ def schema_info() -> list[dict]:
         rows = conn.execute(
             """SELECT table_name, column_name, data_type, is_nullable
                FROM information_schema.columns
-               WHERE table_schema = 'public' AND table_name IN ('person', 'cases', 'person_case_link')
+               WHERE table_schema = 'public' AND table_name IN ('person', 'cases', 'person_case_link', 'evidence')
                ORDER BY table_name, ordinal_position"""
         ).fetchall()
     tables: dict[str, list[dict]] = {}
@@ -256,3 +277,64 @@ def catalog_stats() -> dict:
         cases = conn.execute("SELECT COUNT(*) AS c FROM cases").fetchone()["c"]
         submitted = conn.execute("SELECT COUNT(*) AS c FROM cases WHERE is_seed = false").fetchone()["c"]
         return {"persons": persons, "cases": cases, "submitted_cases": submitted}
+
+
+CASE_STATUSES = ("Open", "Under Investigation", "Charge-sheeted", "Closed")
+CASE_PRIORITIES = ("Low", "Medium", "High", "Critical")
+
+
+def set_case_status(cid: str, status: str | None, priority: str | None) -> dict | None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE cases SET status = COALESCE(%s, status), priority = COALESCE(%s, priority) WHERE cid = %s",
+            (status, priority, cid),
+        )
+        conn.commit()
+    return get_case(cid)
+
+
+def insert_evidence(cid, filename, file_type, size_bytes, sha256, extraction_method,
+                    entity_count, uploaded_by) -> str:
+    evidence_id = new_id("EVD")
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO evidence (evidence_id, cid, filename, file_type, size_bytes, sha256,
+                                     extraction_method, entity_count, uploaded_by)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (evidence_id, cid, filename, file_type, size_bytes, sha256, extraction_method,
+             entity_count, uploaded_by),
+        )
+        conn.commit()
+    return evidence_id
+
+
+def list_evidence(cid: str | None = None) -> list[dict]:
+    with get_connection() as conn:
+        if cid:
+            return conn.execute(
+                "SELECT * FROM evidence WHERE cid = %s ORDER BY created_at DESC", (cid,)
+            ).fetchall()
+        return conn.execute("SELECT * FROM evidence ORDER BY created_at DESC").fetchall()
+
+
+def dashboard_stats() -> dict:
+    with get_connection() as conn:
+        by_type = conn.execute(
+            "SELECT crime_type AS label, COUNT(*) AS count FROM cases GROUP BY crime_type ORDER BY count DESC"
+        ).fetchall()
+        by_month = conn.execute(
+            """SELECT to_char(date_trunc('month', COALESCE(occurred_on::timestamptz, created_at)), 'YYYY-MM') AS month,
+                      COUNT(*) AS count FROM cases GROUP BY 1 ORDER BY 1"""
+        ).fetchall()
+        by_status = conn.execute(
+            "SELECT status AS label, COUNT(*) AS count FROM cases GROUP BY status ORDER BY count DESC"
+        ).fetchall()
+        by_priority = conn.execute(
+            "SELECT priority AS label, COUNT(*) AS count FROM cases GROUP BY priority ORDER BY count DESC"
+        ).fetchall()
+        recent = conn.execute(
+            "SELECT cid, fir_number, crime_type, status, priority, created_at FROM cases ORDER BY created_at DESC LIMIT 5"
+        ).fetchall()
+        evidence = conn.execute("SELECT COUNT(*) AS c FROM evidence").fetchone()["c"]
+    return {"cases_by_type": by_type, "cases_by_month": by_month, "cases_by_status": by_status,
+            "cases_by_priority": by_priority, "recent_cases": recent, "evidence_count": evidence}

@@ -6,6 +6,7 @@ that case, weighted by how many cases they co-occur in) but now persisted,
 with PageRank/betweenness/Louvain run via real GDS instead of networkx.
 """
 import os
+import threading
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
@@ -122,8 +123,14 @@ def to_frontend_graph(highlight_ids: set[str] | None = None) -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
-def analyze() -> dict:
-    with get_driver().session() as session:
+_gds_lock = threading.Lock()
+
+
+def _score_all() -> list[dict]:
+    # The GDS projection has a fixed name and is dropped and rebuilt on every
+    # call, so overlapping requests (dashboard + analysis) collided and one
+    # returned a 500. Serialise them.
+    with _gds_lock, get_driver().session() as session:
         session.run("CALL gds.graph.drop('crimelink', false)")
         session.run(
             "CALL gds.graph.project('crimelink', "
@@ -143,7 +150,8 @@ def analyze() -> dict:
         rows = session.run(
             "MATCH (n) WHERE n:Person OR n:Location OR n:Phone OR n:Vehicle "
             "RETURN id(n) AS internal_id, elementId(n) AS eid, labels(n)[0] AS label, "
-            "coalesce(n.label, n.name, n.number, n.reg) AS text, "
+            "coalesce(n.label, n.name, n.number, n.reg) AS text, n.pid AS pid, "
+            "size([(n)-[:CO_OCCURS]-(m) | m]) AS connections, "
             "size([(n)-[:APPEARS_IN]->() | 1]) AS degree"
         ).data()
 
@@ -161,10 +169,40 @@ def analyze() -> dict:
                 "pagerank": round(pagerank.get(iid, 0), 4),
                 "betweenness": round(betweenness.get(iid, 0), 4),
                 "degree": row["degree"],
+                "pid": row["pid"],
+                "connections": row["connections"],
             }
         )
     scored.sort(key=lambda x: (x["betweenness"], x["pagerank"]), reverse=True)
-    return {"key_connectors": scored[:5]}
+    return scored
+
+
+def analyze() -> dict:
+    return {"key_connectors": _score_all()[:5]}
+
+
+def person_risk() -> dict[str, dict]:
+    """Per-person risk derived from graph centrality, not a stored label:
+    composite = mean of PageRank and betweenness, each scaled by the max among
+    persons. Relative within the current graph, so it shifts as cases are added."""
+    persons = [n for n in _score_all() if n["type"] == "person" and n["pid"]]
+    max_pr = max((p["pagerank"] for p in persons), default=0) or 1
+    max_bt = max((p["betweenness"] for p in persons), default=0) or 1
+    out = {}
+    for p in persons:
+        composite = round((p["pagerank"] / max_pr + p["betweenness"] / max_bt) / 2, 3)
+        level = "High" if composite >= 0.66 else "Medium" if composite >= 0.33 else "Low"
+        out[p["pid"]] = {
+            "risk_level": level, "risk_score": composite, "connections": p["connections"],
+            "pagerank": p["pagerank"], "betweenness": p["betweenness"],
+        }
+    return out
+
+
+def label_counts() -> dict:
+    with get_driver().session() as session:
+        rows = session.run("MATCH (n) RETURN labels(n)[0] AS label, count(*) AS c").data()
+    return {r["label"]: r["c"] for r in rows}
 
 
 def search(query: str) -> list[dict]:
@@ -252,3 +290,38 @@ def neighbors_of_entity(kind: str, value: str) -> list[dict]:
         {"id": row["node_id"], "label": row["text"], "type": type_map[row["label"]]}
         for row in rows
     ]
+
+
+_LINK_WEIGHT = {"Person": 3, "Phone": 3, "Vehicle": 3, "Location": 1}
+_KIND = {"Person": "person", "Phone": "phone", "Vehicle": "vehicle", "Location": "location"}
+
+
+def linked_cases(cid: str) -> list[dict]:
+    """Earlier cases that share an identifier with this one, and what they
+    share. A shared phone, vehicle or person is strong evidence; a shared
+    place is weak (many crimes happen in the same locality), so it counts for
+    less. Returns one row per earlier case, strongest first, so the officer
+    sees not just "linked" but why."""
+    with get_driver().session() as session:
+        rows = session.run(
+            "MATCH (c:Case {cid: $cid})<-[:APPEARS_IN]-(e)-[:APPEARS_IN]->(o:Case) "
+            "WHERE o.cid <> $cid AND (e:Person OR e:Phone OR e:Vehicle OR e:Location) "
+            "RETURN labels(e)[0] AS kind, coalesce(e.pid, e.number, e.reg, e.name) AS did, "
+            "coalesce(e.label, e.name, e.number, e.reg) AS label, "
+            "o.cid AS ocid, o.fir_number AS fir, o.crime_type AS crime",
+            cid=cid,
+        ).data()
+
+    by_case: dict[str, dict] = {}
+    for r in rows:
+        case = by_case.setdefault(
+            r["ocid"], {"cid": r["ocid"], "fir_number": r["fir"], "crime_type": r["crime"], "shared": [], "score": 0}
+        )
+        case["shared"].append({"type": _KIND[r["kind"]], "id": r["did"], "label": r["label"]})
+        case["score"] += _LINK_WEIGHT[r["kind"]]
+
+    out = list(by_case.values())
+    for c in out:
+        c["strength"] = "strong" if c["score"] >= 6 else "moderate" if c["score"] >= 3 else "weak"
+    out.sort(key=lambda c: c["score"], reverse=True)
+    return out

@@ -1,75 +1,93 @@
-import { useEffect, useState } from 'react'
-import { t } from './i18n'
+import { useState } from 'react'
+import { t, tv } from './i18n'
+import { useApi } from './api'
+import { Async, Empty, StatusBadge, STATUS_TONE, PRIORITY_TONE } from './ui'
+
+const COLUMNS = 'grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_150px_90px_90px_80px] items-center gap-4'
+
+function matches(c, q) {
+  if (!q) return true
+  const hay = `${c.fir_number} ${c.crime_type} ${c.status} ${c.priority}`.toLowerCase()
+  return hay.includes(q.toLowerCase())
+}
 
 export default function CasesPanel({ lang, refreshKey, onOpenWorkspace }) {
-  const [cases, setCases] = useState([])
   const [expanded, setExpanded] = useState(null)
-
-  useEffect(() => {
-    fetch('/api/cases')
-      .then((r) => r.json())
-      .then((d) => setCases(d.cases))
-      .catch(() => {})
-  }, [refreshKey])
+  const [filter, setFilter] = useState('')
+  const state = useApi('/api/cases', refreshKey)
 
   return (
-    <div className="p-6 overflow-y-auto h-full space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm uppercase tracking-wide text-gray-400 font-medium">
-          {t('caseRegistry', lang)}
-        </h3>
-        <span className="text-xs text-gray-600">{cases.length} {t('casesCount', lang)}</span>
-      </div>
-
-      <div className="space-y-2">
-        {cases.map((c) => (
-          <div
-            key={c.cid}
-            className="card-surface rounded-lg p-3 cursor-pointer"
-            onClick={() => setExpanded(expanded === c.cid ? null : c.cid)}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-sm text-gray-100 font-medium">{c.fir_number}</span>
-                <span className="ml-2 text-xs text-gray-500">{c.crime_type}</span>
-                {c.is_seed ? (
-                  <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-600 bg-white/5 rounded px-1.5 py-0.5">
-                    {t('seedTag', lang)}
-                  </span>
-                ) : (
-                  <span className="ml-2 text-[10px] uppercase tracking-wide text-[#c77b85] bg-[#8B1E2D]/30 rounded px-1.5 py-0.5">
-                    {t('submittedTag', lang)}
-                  </span>
-                )}
-              </div>
-              <span className="text-xs text-gray-600 font-mono">{c.cid}</span>
-            </div>
-            {expanded === c.cid && (
-              <div className="mt-2 pt-2 border-t border-white/10 text-sm text-gray-400 leading-relaxed">
-                {c.narrative}
-                <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
-                  <span>
-                    {c.occurred_on
-                      ? `${new Date(c.occurred_on).toLocaleDateString()} (occurred)`
-                      : new Date(c.created_at).toLocaleString()}{' '}
-                    · {c.source}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onOpenWorkspace(c.cid)
-                    }}
-                    className="text-[#00AEEF] hover:text-[#5cc9f5]"
-                  >
-                    {t('openWorkspace', lang)} →
-                  </button>
+    <div className="p-6 overflow-y-auto h-full max-w-6xl mx-auto w-full">
+      <Async state={state} lang={lang}>
+        {({ cases }) => {
+          const shown = cases.filter((c) => matches(c, filter))
+          return (
+            <>
+              <div className="flex items-end justify-between gap-4 mb-4">
+                <div>
+                  <h2 className="text-lg font-medium text-white">{t('caseRegistry', lang)}</h2>
+                  <p className="text-xs text-gray-500 mt-0.5 num">
+                    {shown.length === cases.length ? cases.length : `${shown.length} / ${cases.length}`} {t('casesCount', lang)}
+                  </p>
                 </div>
+                <input
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder={t('filterCases', lang)}
+                  aria-label={t('filterCases', lang)}
+                  className="w-80 bg-[var(--bg-panel)] border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                />
               </div>
-            )}
-          </div>
-        ))}
-        {cases.length === 0 && <div className="text-sm text-gray-600">No cases yet.</div>}
-      </div>
+
+              <div className={`${COLUMNS} px-4 pb-2 text-[10px] uppercase tracking-wider text-gray-500`}>
+                <span>{t('colFir', lang)}</span>
+                <span>{t('crimeType', lang)}</span>
+                <span>{t('colStatus', lang)}</span>
+                <span>{t('colPriority', lang)}</span>
+                <span>{t('colDate', lang)}</span>
+                <span />
+              </div>
+
+              <div className="space-y-1.5">
+                {shown.map((c) => (
+                  <div key={c.cid} className="card-surface rounded-lg">
+                    <button
+                      onClick={() => setExpanded(expanded === c.cid ? null : c.cid)}
+                      className={`${COLUMNS} w-full text-left px-4 py-3`}
+                      aria-expanded={expanded === c.cid}
+                    >
+                      <span className="num text-sm text-white truncate">{c.fir_number}</span>
+                      <span className="text-sm text-gray-300 truncate">{c.crime_type}</span>
+                      <StatusBadge tone={STATUS_TONE[c.status] || 'neutral'}>{tv('status', c.status, lang)}</StatusBadge>
+                      <StatusBadge tone={PRIORITY_TONE[c.priority] || 'neutral'}>{tv('priority', c.priority, lang)}</StatusBadge>
+                      <span className="num text-xs text-gray-400">
+                        {new Date(c.occurred_on || c.created_at).toLocaleDateString()}
+                      </span>
+                      <span className="text-xs text-gray-500 text-right">
+                        {c.is_seed ? t('seedTag', lang) : t('submittedTag', lang)}
+                      </span>
+                    </button>
+                    {expanded === c.cid && (
+                      <div className="px-4 pb-3 pt-3 border-t border-white/10 text-sm text-gray-300 leading-relaxed">
+                        {c.narrative}
+                        <div className="mt-3">
+                          <button
+                            onClick={() => onOpenWorkspace(c.cid)}
+                            className="text-xs text-[var(--accent-ink)] hover:text-[var(--accent-ink-hover)]"
+                          >
+                            {t('openWorkspace', lang)} →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {shown.length === 0 && <Empty>{t('noResults', lang)}</Empty>}
+              </div>
+            </>
+          )
+        }}
+      </Async>
     </div>
   )
 }

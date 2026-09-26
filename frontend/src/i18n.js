@@ -1,560 +1,64 @@
+import en from './locales/en.json'
+
+// One JSON file per language in ./locales, loaded when first chosen so the
+// initial bundle carries English only. English is the fallback for any key a
+// language does not have yet, and a missing key renders as the key itself
+// (which makes a forgotten string visible instead of blank).
+//
+// Languages are the official languages of the Indian states and union
+// territories. The non-English files are machine translations and have not
+// been reviewed by native speakers (see MD/RULES.md).
 export const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'hi', label: 'हिन्दी' },
   { code: 'mr', label: 'मराठी' },
   { code: 'ta', label: 'தமிழ்' },
   { code: 'bn', label: 'বাংলা' },
+  { code: 'te', label: 'తెలుగు' },
+  { code: 'kn', label: 'ಕನ್ನಡ' },
+  { code: 'ml', label: 'മലയാളം' },
+  { code: 'gu', label: 'ગુજરાતી' },
+  { code: 'pa', label: 'ਪੰਜਾਬੀ' },
+  { code: 'or', label: 'ଓଡ଼ିଆ' },
+  { code: 'as', label: 'অসমীয়া' },
+  { code: 'ur', label: 'اردو', rtl: true },
+  { code: 'ne', label: 'नेपाली' },
+  { code: 'kok', label: 'कोंकणी' },
+  { code: 'mni', label: 'ꯃꯩꯇꯩꯂꯣꯟ' },
+  { code: 'brx', label: 'बड़ो' },
+  { code: 'ks', label: 'کٲشُر', rtl: true },
+  { code: 'doi', label: 'डोगरी' },
+  { code: 'lus', label: 'Mizo' },
+  { code: 'kha', label: 'Khasi' },
+  { code: 'trp', label: 'Kokborok' },
 ]
 
-const STRINGS = {
-  appTitle: {
-    en: 'CrimeLink · Network Analysis',
-    hi: 'क्राइमलिंक · नेटवर्क विश्लेषण',
-    mr: 'क्राइमलिंक · नेटवर्क विश्लेषण',
-    ta: 'கிரைம்லிங்க் · நெட்வொர்க் பகுப்பாய்வு',
-    bn: 'ক্রাইমলিংক · নেটওয়ার্ক বিশ্লেষণ',
-  },
-  tagline: {
-    en: 'AI-powered entity extraction & hidden-connection discovery for criminal investigations',
-    hi: 'आपराधिक जांच के लिए AI-संचालित इकाई निष्कर्षण और छिपे हुए संबंधों की खोज',
-    mr: 'गुन्हेगारी तपासासाठी AI-आधारित घटक निष्कर्षण आणि लपलेले संबंध शोध',
-    ta: 'குற்றவியல் விசாரணைகளுக்கான AI-இயங்கும் நிறுவன பிரித்தெடுத்தல் மற்றும் மறைந்த தொடர்பு கண்டறிதல்',
-    bn: 'অপরাধ তদন্তের জন্য AI-চালিত সত্তা নিষ্কাশন ও লুকানো সংযোগ আবিষ্কার',
-  },
-  orgLine1: {
-    en: 'NCRB · Women Safety Division',
-    hi: 'एनसीआरबी · महिला सुरक्षा प्रभाग',
-    mr: 'एनसीआरबी · महिला सुरक्षा विभाग',
-    ta: 'என்சிஆர்பி · பெண்கள் பாதுகாப்புப் பிரிவு',
-    bn: 'এনসিআরবি · নারী নিরাপত্তা বিভাগ',
-  },
-  orgLine2: {
-    en: 'SIH 2026 Prototype',
-    hi: 'एसआईएच 2026 प्रोटोटाइप',
-    mr: 'एसआयएच 2026 प्रोटोटाइप',
-    ta: 'SIH 2026 முன்மாதிரி',
-    bn: 'এসআইএইচ ২০২৬ প্রোটোটাইপ',
-  },
-  tabNetwork: {
-    en: 'Network Analysis',
-    hi: 'नेटवर्क विश्लेषण',
-    mr: 'नेटवर्क विश्लेषण',
-    ta: 'நெட்வொர்க் பகுப்பாய்வு',
-    bn: 'নেটওয়ার্ক বিশ্লেষণ',
-  },
-  tabHotspots: {
-    en: 'Crime Hotspots (NCRB Data)',
-    hi: 'अपराध हॉटस्पॉट (एनसीआरबी डेटा)',
-    mr: 'गुन्हे हॉटस्पॉट (एनसीआरबी डेटा)',
-    ta: 'குற்ற ஹாட்ஸ்பாட் (NCRB தரவு)',
-    bn: 'অপরাধ হটস্পট (এনসিআরবি ডেটা)',
-  },
-  newFirNarrative: {
-    en: 'New FIR Narrative',
-    hi: 'नई एफआईआर कथा',
-    mr: 'नवीन एफआयआर वर्णन',
-    ta: 'புதிய FIR விவரணை',
-    bn: 'নতুন এফআইআর বিবরণ',
-  },
-  firNumber: {
-    en: 'FIR Number',
-    hi: 'एफआईआर संख्या',
-    mr: 'एफआयआर क्रमांक',
-    ta: 'FIR எண்',
-    bn: 'এফআইআর নম্বর',
-  },
-  crimeType: {
-    en: 'Crime Type',
-    hi: 'अपराध प्रकार',
-    mr: 'गुन्हा प्रकार',
-    ta: 'குற்ற வகை',
-    bn: 'অপরাধের ধরন',
-  },
-  loadSample: {
-    en: 'Load sample FIR',
-    hi: 'नमूना एफआईआर लोड करें',
-    mr: 'नमुना एफआयआर लोड करा',
-    ta: 'மாதிரி FIR ஏற்று',
-    bn: 'নমুনা এফআইআর লোড করুন',
-  },
-  choosePlaceholder: {
-    en: 'Choose an existing case narrative...',
-    hi: 'मौजूदा केस विवरण चुनें...',
-    mr: 'विद्यमान प्रकरण वर्णन निवडा...',
-    ta: 'தற்போதைய வழக்கு விவரிப்பைத் தேர்வுசெய்யவும்...',
-    bn: 'বিদ্যমান মামলার বিবরণ নির্বাচন করুন...',
-  },
-  analyzeBtn: {
-    en: 'Extract & Analyze Network',
-    hi: 'निकालें और नेटवर्क का विश्लेषण करें',
-    mr: 'काढा आणि नेटवर्कचे विश्लेषण करा',
-    ta: 'பிரித்தெடுத்து நெட்வொர்க்கை பகுப்பாய்வு செய்',
-    bn: 'নিষ্কাশন করুন ও নেটওয়ার্ক বিশ্লেষণ করুন',
-  },
-  analyzing: {
-    en: 'Analyzing…',
-    hi: 'विश्लेषण हो रहा है…',
-    mr: 'विश्लेषण करत आहे…',
-    ta: 'பகுப்பாய்வு செய்யப்படுகிறது…',
-    bn: 'বিশ্লেষণ চলছে…',
-  },
-  extractedEntities: {
-    en: 'Extracted Entities',
-    hi: 'निकाली गई इकाइयाँ',
-    mr: 'काढलेले घटक',
-    ta: 'பிரித்தெடுக்கப்பட்ட நிறுவனங்கள்',
-    bn: 'নিষ্কাশিত সত্তা',
-  },
-  hiddenConnections: {
-    en: '⚠ Hidden Connections Found',
-    hi: '⚠ छिपे हुए संबंध मिले',
-    mr: '⚠ लपलेले संबंध सापडले',
-    ta: '⚠ மறைந்த தொடர்புகள் கண்டறியப்பட்டன',
-    bn: '⚠ লুকানো সংযোগ পাওয়া গেছে',
-  },
-  keyConnectors: {
-    en: 'Key Connectors (Network-wide)',
-    hi: 'मुख्य कड़ियाँ (संपूर्ण नेटवर्क)',
-    mr: 'मुख्य दुवे (संपूर्ण नेटवर्क)',
-    ta: 'முக்கிய இணைப்புகள் (முழு நெட்வொர்க்)',
-    bn: 'প্রধান সংযোগকারী (সম্পূর্ণ নেটওয়ার্ক)',
-  },
-  runAnalysisPrompt: {
-    en: 'Run an analysis to render the network graph',
-    hi: 'नेटवर्क ग्राफ़ देखने के लिए विश्लेषण चलाएँ',
-    mr: 'नेटवर्क आलेख पाहण्यासाठी विश्लेषण चालवा',
-    ta: 'நெட்வொர்க் வரைபடத்தைக் காண பகுப்பாய்வை இயக்கவும்',
-    bn: 'নেটওয়ার্ক গ্রাফ দেখতে বিশ্লেষণ চালান',
-  },
-  entities: {
-    en: 'entities',
-    hi: 'इकाइयाँ',
-    mr: 'घटक',
-    ta: 'நிறுவனங்கள்',
-    bn: 'সত্তা',
-  },
-  connections: {
-    en: 'connections',
-    hi: 'संबंध',
-    mr: 'संबंध',
-    ta: 'இணைப்புகள்',
-    bn: 'সংযোগ',
-  },
-  hotspotState: {
-    en: 'State',
-    hi: 'राज्य',
-    mr: 'राज्य',
-    ta: 'மாநிலம்',
-    bn: 'রাজ্য',
-  },
-  hotspotAllStates: {
-    en: 'All States',
-    hi: 'सभी राज्य',
-    mr: 'सर्व राज्ये',
-    ta: 'அனைத்து மாநிலங்கள்',
-    bn: 'সব রাজ্য',
-  },
-  hotspotCrimeType: {
-    en: 'Crime Category',
-    hi: 'अपराध श्रेणी',
-    mr: 'गुन्हा श्रेणी',
-    ta: 'குற்ற வகை',
-    bn: 'অপরাধের বিভাগ',
-  },
-  hotspotTitle: {
-    en: 'Top Districts',
-    hi: 'शीर्ष जिले',
-    mr: 'शीर्ष जिल्हे',
-    ta: 'முதன்மை மாவட்டங்கள்',
-    bn: 'শীর্ষ জেলা',
-  },
-  hotspotSource: {
-    en: 'Source: NCRB district-wise crime data (data.gov.in)',
-    hi: 'स्रोत: एनसीआरबी जिलेवार अपराध डेटा (data.gov.in)',
-    mr: 'स्रोत: एनसीआरबी जिल्हानिहाय गुन्हे डेटा (data.gov.in)',
-    ta: 'மூலம்: NCRB மாவட்டவாரி குற்றத் தரவு (data.gov.in)',
-    bn: 'উৎস: এনসিআরবি জেলাভিত্তিক অপরাধ ডেটা (data.gov.in)',
-  },
-  tabCases: {
-    en: 'Case Registry',
-    hi: 'केस रजिस्ट्री',
-    mr: 'केस रजिस्ट्री',
-    ta: 'வழக்கு பதிவேடு',
-    bn: 'মামলার নিবন্ধন',
-  },
-  caseRegistry: {
-    en: 'Persisted Cases',
-    hi: 'सहेजे गए मामले',
-    mr: 'साठवलेली प्रकरणे',
-    ta: 'சேமிக்கப்பட்ட வழக்குகள்',
-    bn: 'সংরক্ষিত মামলা',
-  },
-  casesCount: {
-    en: 'cases',
-    hi: 'मामले',
-    mr: 'प्रकरणे',
-    ta: 'வழக்குகள்',
-    bn: 'মামলা',
-  },
-  seedTag: {
-    en: 'sample',
-    hi: 'नमूना',
-    mr: 'नमुना',
-    ta: 'மாதிரி',
-    bn: 'নমুনা',
-  },
-  submittedTag: {
-    en: 'submitted',
-    hi: 'सबमिट किया गया',
-    mr: 'सबमिट केले',
-    ta: 'சமர்ப்பிக்கப்பட்டது',
-    bn: 'জমা দেওয়া হয়েছে',
-  },
-  entityResolution: {
-    en: 'Entity Resolution',
-    hi: 'इकाई समाधान',
-    mr: 'घटक निराकरण',
-    ta: 'நிறுவன தீர்மானம்',
-    bn: 'সত্তা সমাধান',
-  },
-  newPid: {
-    en: 'new',
-    hi: 'नया',
-    mr: 'नवीन',
-    ta: 'புதிய',
-    bn: 'নতুন',
-  },
-  matchedPid: {
-    en: 'matched',
-    hi: 'मेल खाया',
-    mr: 'जुळले',
-    ta: 'பொருந்தியது',
-    bn: 'মিলেছে',
-  },
-  similarCases: {
-    en: '🔍 Similar MO Cases (vector similarity)',
-    hi: '🔍 समान एमओ मामले (वेक्टर समानता)',
-    mr: '🔍 समान एमओ प्रकरणे (व्हेक्टर साम्य)',
-    ta: '🔍 ஒத்த MO வழக்குகள் (திசையன் ஒற்றுமை)',
-    bn: '🔍 অনুরূপ এমও মামলা (ভেক্টর সাদৃশ্য)',
-  },
-  loginSubtitle: {
-    en: 'Sign in to continue to the investigation workspace',
-    hi: 'जांच कार्यक्षेत्र में जारी रखने के लिए साइन इन करें',
-    mr: 'तपास कार्यक्षेत्रात सुरू ठेवण्यासाठी साइन इन करा',
-    ta: 'விசாரணை பணிமனையைத் தொடர உள்நுழையவும்',
-    bn: 'তদন্ত কর্মক্ষেত্রে চালিয়ে যেতে সাইন ইন করুন',
-  },
-  investigatorName: {
-    en: 'Investigator Name',
-    hi: 'जांच अधिकारी का नाम',
-    mr: 'तपास अधिकाऱ्याचे नाव',
-    ta: 'விசாரணை அதிகாரி பெயர்',
-    bn: 'তদন্তকারী কর্মকর্তার নাম',
-  },
-  investigatorNamePlaceholder: {
-    en: 'e.g. Insp. Rao',
-    hi: 'जैसे इंस्पेक्टर राव',
-    mr: 'उदा. इन्स्पेक्टर राव',
-    ta: 'உதா. இன்ஸ்பெக்டர் ராவ்',
-    bn: 'যেমন ইন্সপেক্টর রাও',
-  },
-  loginButton: {
-    en: 'Enter Workspace',
-    hi: 'कार्यक्षेत्र में प्रवेश करें',
-    mr: 'कार्यक्षेत्रात प्रवेश करा',
-    ta: 'பணிமனையில் நுழையவும்',
-    bn: 'কর্মক্ষেত্রে প্রবেশ করুন',
-  },
-  loginNote: {
-    en: 'Demo login — name only, no password. Real deployment needs full identity/role-based auth.',
-    hi: 'डेमो लॉगिन — केवल नाम, कोई पासवर्ड नहीं। वास्तविक तैनाती के लिए पूर्ण पहचान/भूमिका-आधारित प्रमाणीकरण आवश्यक है।',
-    mr: 'डेमो लॉगिन — फक्त नाव, पासवर्ड नाही. खऱ्या तैनातीसाठी संपूर्ण ओळख/भूमिका-आधारित प्रमाणीकरण आवश्यक आहे.',
-    ta: 'டெமோ உள்நுழைவு — பெயர் மட்டும், கடவுச்சொல் இல்லை. உண்மையான வரிசைப்படுத்தலுக்கு முழு அடையாள/பங்கு அடிப்படையிலான அங்கீகாரம் தேவை.',
-    bn: 'ডেমো লগইন — শুধু নাম, পাসওয়ার্ড নেই। প্রকৃত স্থাপনার জন্য সম্পূর্ণ পরিচয়/ভূমিকা-ভিত্তিক প্রমাণীকরণ প্রয়োজন।',
-  },
-  loggedInAs: {
-    en: 'Signed in as',
-    hi: 'के रूप में साइन इन',
-    mr: 'म्हणून साइन इन',
-    ta: 'இப்படி உள்நுழைந்துள்ளீர்கள்',
-    bn: 'হিসাবে সাইন ইন করা হয়েছে',
-  },
-  collapsePanel: {
-    en: 'Collapse panel',
-    hi: 'पैनल संक्षिप्त करें',
-    mr: 'पॅनेल आकुंचित करा',
-    ta: 'பலகத்தை மடக்கு',
-    bn: 'প্যানেল সংকুচিত করুন',
-  },
-  expandPanel: {
-    en: 'Expand panel',
-    hi: 'पैनल विस्तृत करें',
-    mr: 'पॅनेल विस्तृत करा',
-    ta: 'பலகத்தை விரிவாக்கு',
-    bn: 'প্যানেল প্রসারিত করুন',
-  },
-  zoomIn: {
-    en: 'Zoom in',
-    hi: 'बड़ा करें',
-    mr: 'झूम इन',
-    ta: 'பெரிதாக்கு',
-    bn: 'জুম ইন',
-  },
-  zoomOut: {
-    en: 'Zoom out',
-    hi: 'छोटा करें',
-    mr: 'झूम आउट',
-    ta: 'சிறிதாக்கு',
-    bn: 'জুম আউট',
-  },
-  fitView: {
-    en: 'Fit to view',
-    hi: 'दृश्य में समायोजित करें',
-    mr: 'दृश्यात बसवा',
-    ta: 'பார்வைக்கு பொருத்து',
-    bn: 'দৃশ্যে ফিট করুন',
-  },
-  logout: {
-    en: 'Sign out',
-    hi: 'साइन आउट',
-    mr: 'साइन आउट',
-    ta: 'வெளியேறு',
-    bn: 'সাইন আউট',
-  },
-  tabSearch: {
-    en: 'Smart Search',
-    hi: 'स्मार्ट खोज',
-    mr: 'स्मार्ट शोध',
-    ta: 'ஸ்மார்ட் தேடல்',
-    bn: 'স্মার্ট সার্চ',
-  },
-  tabTimeline: {
-    en: 'Timeline',
-    hi: 'समयरेखा',
-    mr: 'कालरेखा',
-    ta: 'காலவரிசை',
-    bn: 'সময়রেখা',
-  },
-  back: {
-    en: 'Back',
-    hi: 'वापस',
-    mr: 'मागे',
-    ta: 'பின்',
-    bn: 'ফিরে যান',
-  },
-  loading: {
-    en: 'Loading',
-    hi: 'लोड हो रहा है',
-    mr: 'लोड होत आहे',
-    ta: 'ஏற்றுகிறது',
-    bn: 'লোড হচ্ছে',
-  },
-  aliases: {
-    en: 'Aliases',
-    hi: 'उपनाम',
-    mr: 'टोपणनावे',
-    ta: 'மாற்றுப் பெயர்கள்',
-    bn: 'ছদ্মনাম',
-  },
-  knownPhones: {
-    en: 'Known Phones',
-    hi: 'ज्ञात फोन',
-    mr: 'ज्ञात फोन',
-    ta: 'அறியப்பட்ட தொலைபேசிகள்',
-    bn: 'পরিচিত ফোন',
-  },
-  knownVehicles: {
-    en: 'Known Vehicles',
-    hi: 'ज्ञात वाहन',
-    mr: 'ज्ञात वाहने',
-    ta: 'அறியப்பட்ட வாகனங்கள்',
-    bn: 'পরিচিত যানবাহন',
-  },
-  caseHistory: {
-    en: 'Case History',
-    hi: 'केस इतिहास',
-    mr: 'प्रकरण इतिहास',
-    ta: 'வழக்கு வரலாறு',
-    bn: 'মামলার ইতিহাস',
-  },
-  noCases: {
-    en: 'No cases linked to this person yet.',
-    hi: 'इस व्यक्ति से अभी तक कोई मामला जुड़ा नहीं है।',
-    mr: 'या व्यक्तीशी अद्याप कोणतेही प्रकरण जोडलेले नाही.',
-    ta: 'இந்த நபருடன் இதுவரை எந்த வழக்கும் இணைக்கப்படவில்லை.',
-    bn: 'এই ব্যক্তির সাথে এখনও কোনো মামলা যুক্ত নেই।',
-  },
-  searchPlaceholder: {
-    en: 'Search people, locations, phones, vehicles, cases…',
-    hi: 'व्यक्ति, स्थान, फोन, वाहन, मामले खोजें…',
-    mr: 'व्यक्ती, ठिकाणे, फोन, वाहने, प्रकरणे शोधा…',
-    ta: 'நபர்கள், இடங்கள், தொலைபேசிகள், வாகனங்கள், வழக்குகளைத் தேடுங்கள்…',
-    bn: 'ব্যক্তি, স্থান, ফোন, যানবাহন, মামলা অনুসন্ধান করুন…',
-  },
-  searchButton: {
-    en: 'Search',
-    hi: 'खोजें',
-    mr: 'शोधा',
-    ta: 'தேடு',
-    bn: 'অনুসন্ধান',
-  },
-  people: {
-    en: 'People',
-    hi: 'व्यक्ति',
-    mr: 'व्यक्ती',
-    ta: 'நபர்கள்',
-    bn: 'ব্যক্তি',
-  },
-  locationsPhonesVehicles: {
-    en: 'Locations / Phones / Vehicles',
-    hi: 'स्थान / फोन / वाहन',
-    mr: 'ठिकाणे / फोन / वाहने',
-    ta: 'இடங்கள் / தொலைபேசிகள் / வாகனங்கள்',
-    bn: 'স্থান / ফোন / যানবাহন',
-  },
-  cases: {
-    en: 'Cases',
-    hi: 'मामले',
-    mr: 'प्रकरणे',
-    ta: 'வழக்குகள்',
-    bn: 'মামলা',
-  },
-  noResults: {
-    en: 'No results.',
-    hi: 'कोई परिणाम नहीं।',
-    mr: 'कोणतेही निकाल नाहीत.',
-    ta: 'முடிவுகள் இல்லை.',
-    bn: 'কোনো ফলাফল নেই।',
-  },
-  timelineTitle: {
-    en: 'Case Timeline',
-    hi: 'केस समयरेखा',
-    mr: 'प्रकरण कालरेखा',
-    ta: 'வழக்கு காலவரிசை',
-    bn: 'মামলার সময়রেখা',
-  },
-  timelineNote: {
-    en: 'Ordered by occurrence date when it could be extracted (green), otherwise by ingestion time (gray) — most narrative text has no explicit date.',
-    hi: 'जहाँ घटना की तारीख निकाली जा सकी वहाँ उसके अनुसार क्रमबद्ध (हरा), अन्यथा अंतर्ग्रहण समय (धूसर) के अनुसार।',
-    mr: 'जिथे घटना तारीख काढता आली तिथे त्यानुसार क्रमवारी (हिरवा), अन्यथा इनजेशन वेळेनुसार (राखाडी).',
-    ta: 'நிகழ்வு தேதியைப் பிரித்தெடுக்க முடிந்தால் அதன்படி (பச்சை), இல்லையெனில் உள்வாங்கல் நேரப்படி (சாம்பல்) வரிசைப்படுத்தப்பட்டுள்ளது.',
-    bn: 'ঘটনার তারিখ নিষ্কাশন করা গেলে তার ভিত্তিতে (সবুজ), নাহলে ইনজেশন সময়ের ভিত্তিতে (ধূসর) সাজানো।',
-  },
-  catalogLabel: {
-    en: 'Data Catalog',
-    hi: 'डेटा कैटलॉग',
-    mr: 'डेटा कॅटलॉग',
-    ta: 'தரவு பட்டியல்',
-    bn: 'ডেটা ক্যাটালগ',
-  },
-  catPersons: {
-    en: 'persons',
-    hi: 'व्यक्ति',
-    mr: 'व्यक्ती',
-    ta: 'நபர்கள்',
-    bn: 'ব্যক্তি',
-  },
-  catCases: {
-    en: 'cases',
-    hi: 'मामले',
-    mr: 'प्रकरणे',
-    ta: 'வழக்குகள்',
-    bn: 'মামলা',
-  },
-  catNodes: {
-    en: 'graph nodes',
-    hi: 'ग्राफ़ नोड्स',
-    mr: 'ग्राफ नोड्स',
-    ta: 'வரைபட முனைகள்',
-    bn: 'গ্রাফ নোড',
-  },
-  catEdges: {
-    en: 'edges',
-    hi: 'किनारे',
-    mr: 'कडा',
-    ta: 'விளிம்புகள்',
-    bn: 'প্রান্ত',
-  },
-  catalogSchemaToggle: {
-    en: 'Schema',
-    hi: 'स्कीमा',
-    mr: 'स्कीमा',
-    ta: 'ஸ்கீமா',
-    bn: 'স্কিমা',
-  },
-  catVectors: {
-    en: 'vectors',
-    hi: 'वेक्टर',
-    mr: 'व्हेक्टर',
-    ta: 'திசையன்கள்',
-    bn: 'ভেক্টর',
-  },
-  hotspotMapTitle: {
-    en: 'State Map',
-    hi: 'राज्य मानचित्र',
-    mr: 'राज्य नकाशा',
-    ta: 'மாநில வரைபடம்',
-    bn: 'রাজ্য মানচিত্র',
-  },
-  mapApproxNote: {
-    en: 'State-level markers use approximate centroids, not a real geospatial database — see DECISIONS.md.',
-    hi: 'राज्य-स्तरीय मार्कर अनुमानित केंद्रबिंदुओं का उपयोग करते हैं, वास्तविक भू-स्थानिक डेटाबेस का नहीं।',
-    mr: 'राज्य-स्तरीय मार्कर अंदाजे केंद्रबिंदू वापरतात, खऱ्या भू-स्थानिक डेटाबेसचा नाही.',
-    ta: 'மாநில அளவிலான குறிப்பான்கள் தோராயமான மையப்புள்ளிகளைப் பயன்படுத்துகின்றன, உண்மையான புவி-இடவியல் தரவுத்தளம் அல்ல.',
-    bn: 'রাজ্য-স্তরের মার্কারগুলি আনুমানিক কেন্দ্রবিন্দু ব্যবহার করে, প্রকৃত ভূ-স্থানিক ডেটাবেস নয়।',
-  },
-  uploadFile: {
-    en: 'Upload evidence file',
-    hi: 'साक्ष्य फ़ाइल अपलोड करें',
-    mr: 'पुरावा फाइल अपलोड करा',
-    ta: 'ஆதார கோப்பைப் பதிவேற்றவும்',
-    bn: 'প্রমাণ ফাইল আপলোড করুন',
-  },
-  uploadNote: {
-    en: 'Accepts .txt, .pdf, .docx, .pptx, .xlsx, .html, .csv, and images (with OCR if a text photo — set GROQ_API_KEY). Scanned (image-only) PDFs/Word docs aren’t OCR’d yet.',
-    hi: '.txt, .pdf, .docx, .pptx, .xlsx, .html, .csv, और छवियाँ स्वीकार करता है (टेक्स्ट फोटो के लिए OCR सहित — GROQ_API_KEY सेट करें)। स्कैन किए गए (केवल-छवि) PDF/Word दस्तावेज़ अभी OCR नहीं होते।',
-    mr: '.txt, .pdf, .docx, .pptx, .xlsx, .html, .csv, आणि प्रतिमा स्वीकारते (मजकूर फोटोसाठी OCR सह — GROQ_API_KEY सेट करा). स्कॅन केलेले (फक्त-प्रतिमा) PDF/Word दस्तऐवज अद्याप OCR होत नाहीत.',
-    ta: '.txt, .pdf, .docx, .pptx, .xlsx, .html, .csv, மற்றும் படங்களை ஏற்கிறது (உரைப் புகைப்படமாக இருந்தால் OCR உடன் — GROQ_API_KEY அமைக்கவும்). ஸ்கேன் செய்யப்பட்ட (படம் மட்டும்) PDF/Word ஆவணங்கள் இன்னும் OCR செய்யப்படவில்லை.',
-    bn: '.txt, .pdf, .docx, .pptx, .xlsx, .html, .csv, এবং ছবি গ্রহণ করে (টেক্সট ছবি হলে OCR সহ — GROQ_API_KEY সেট করুন)। স্ক্যান করা (শুধু-ছবি) PDF/Word নথি এখনও OCR হয় না।',
-  },
-  noPersonsInCase: {
-    en: 'No persons extracted from this case.',
-    hi: 'इस मामले से कोई व्यक्ति नहीं निकाला गया।',
-    mr: 'या प्रकरणातून कोणतीही व्यक्ती काढली गेली नाही.',
-    ta: 'இந்த வழக்கிலிருந்து எந்த நபரும் பிரித்தெடுக்கப்படவில்லை.',
-    bn: 'এই মামলা থেকে কোনো ব্যক্তি নিষ্কাশিত হয়নি।',
-  },
-  openWorkspace: {
-    en: 'Open workspace',
-    hi: 'कार्यक्षेत्र खोलें',
-    mr: 'कार्यक्षेत्र उघडा',
-    ta: 'பணிமனையைத் திற',
-    bn: 'কর্মক্ষেত্র খুলুন',
-  },
-  caseSubgraph: {
-    en: 'Case Network',
-    hi: 'केस नेटवर्क',
-    mr: 'प्रकरण नेटवर्क',
-    ta: 'வழக்கு நெட்வொர்க்',
-    bn: 'মামলার নেটওয়ার্ক',
-  },
-  leadReport: {
-    en: '📋 Investigation Lead Report',
-    hi: '📋 जांच लीड रिपोर्ट',
-    mr: '📋 तपास लीड अहवाल',
-    ta: '📋 விசாரணை முன்னணி அறிக்கை',
-    bn: '📋 তদন্ত লিড রিপোর্ট',
-  },
-  illustrativeNote: {
-    en: 'FIR narratives below are illustrative sample text (real per-case narrative data is restricted CCTNS access) — the extraction pipeline works on any real text you paste in.',
-    hi: 'नीचे दी गई एफआईआर कथाएँ उदाहरण के लिए हैं (वास्तविक केस डेटा तक पहुँच सीमित है) — यह पाइपलाइन किसी भी वास्तविक टेक्स्ट पर काम करती है।',
-    mr: 'खालील एफआयआर वर्णने उदाहरणादाखल आहेत (खरा केस डेटा प्रवेश मर्यादित आहे) — ही प्रणाली कोणत्याही खऱ्या मजकुरावर कार्य करते.',
-    ta: 'கீழே உள்ள FIR விவரிப்புகள் எடுத்துக்காட்டு உரை (உண்மையான வழக்கு தரவு அணுகல் கட்டுப்படுத்தப்பட்டுள்ளது) — நீங்கள் ஒட்டும் எந்த உண்மையான உரையிலும் இந்த முறை செயல்படும்.',
-    bn: 'নিচের এফআইআর বিবরণগুলি উদাহরণস্বরূপ পাঠ্য (প্রকৃত মামলার ডেটা সীমাবদ্ধ) — আপনি যেকোনো প্রকৃত পাঠ্য পেস্ট করলেই এই পাইপলাইন কাজ করবে।',
-  },
+const loaders = import.meta.glob(['./locales/*.json', '!./locales/en.json'])
+const bundles = { en }
+
+export async function loadLanguage(code) {
+  if (bundles[code]) return true
+  const load = loaders[`./locales/${code}.json`]
+  if (!load) return false
+  try {
+    bundles[code] = (await load()).default
+    return true
+  } catch {
+    return false
+  }
 }
 
+export const isRtl = (code) => Boolean(LANGUAGES.find((l) => l.code === code)?.rtl)
+
 export function t(key, lang) {
-  return STRINGS[key]?.[lang] ?? STRINGS[key]?.en ?? key
+  return bundles[lang]?.[key] ?? bundles.en[key] ?? key
+}
+
+// Translate a value that comes from the data (a status, a priority, an
+// entity type) through a prefixed key, and show the raw value if there is no
+// translation for it.
+export function tv(prefix, value, lang) {
+  const key = `${prefix}_${value}`
+  const out = t(key, lang)
+  return out === key ? value : out
 }
